@@ -103,6 +103,25 @@ uint8_t limits_ui_go_target(uint8_t idx, uint8_t *axis, int32_t *target) {
     return 1;
 }
 
+uint8_t limits_ui_go_target_dir(uint8_t axis, int8_t sign, uint8_t *idx, int32_t *target) {
+    if (axis > AXIS_Z || sign == 0 || idx == NULL || target == NULL) return 0;
+
+    uint8_t lim_idx = (sign > 0)
+        ? ((axis == AXIS_Z) ? 2 : 1)
+        : ((axis == AXIS_Z) ? 0 : 3);
+
+    if (!limit_active[lim_idx]) return 0;
+
+    int32_t cur = read_axis_pos(axis);
+    int32_t tgt = limit_pos[lim_idx];
+    if (sign > 0 && cur >= tgt) return 0;
+    if (sign < 0 && cur <= tgt) return 0;
+
+    *idx = lim_idx;
+    *target = tgt;
+    return 1;
+}
+
 uint8_t limits_ui_led_on(uint8_t idx) {
     return (idx < 4) ? limit_active[idx] : 0;
 }

@@ -72,6 +72,7 @@ static int setting_get(uint8_t id, char *buf, size_t len) {
     case 13: snprintf(buf, len, "%u", config_get_max_speed_mm_min(AXIS_Z)); return 1;
     case 14: snprintf(buf, len, "%u", config_get_rapid_speed_mm_min(AXIS_Z)); return 1;
     case 15: snprintf(buf, len, "%u", config_get_feed_accel(AXIS_Z)); return 1;
+    case 17: snprintf(buf, len, "%u", config_get_dir_invert(AXIS_Z)); return 1;
     case 16: format_spm(buf, len, AXIS_Z); return 1;
     case 20: snprintf(buf, len, "%u", config_get_motor_steps(AXIS_X)); return 1;
     case 21: snprintf(buf, len, "%u", config_get_microstep(AXIS_X)); return 1;
@@ -79,6 +80,7 @@ static int setting_get(uint8_t id, char *buf, size_t len) {
     case 23: snprintf(buf, len, "%u", config_get_max_speed_mm_min(AXIS_X)); return 1;
     case 24: snprintf(buf, len, "%u", config_get_rapid_speed_mm_min(AXIS_X)); return 1;
     case 25: snprintf(buf, len, "%u", config_get_feed_accel(AXIS_X)); return 1;
+    case 27: snprintf(buf, len, "%u", config_get_dir_invert(AXIS_X)); return 1;
     case 26: format_spm(buf, len, AXIS_X); return 1;
     case 30: snprintf(buf, len, "%u", config_get_spindle_ppr()); return 1;
     case 31: snprintf(buf, len, "%u", config_get_buzzer_on()); return 1;
@@ -162,6 +164,10 @@ static int setting_set(uint8_t id, const char *val) {
         config_set_feed_accel(AXIS_Z, (uint8_t)u16);
         config_machine_save();
         return 1;
+    case 17:
+        config_set_dir_invert(AXIS_Z, (val[0] == '1') ? 1U : 0U);
+        config_machine_save();
+        return 1;
     case 20:
         if (!parse_u16(val, &u16)) return 0;
         config_set_motor_steps(AXIS_X, u16);
@@ -192,6 +198,10 @@ static int setting_set(uint8_t id, const char *val) {
         config_set_feed_accel(AXIS_X, (uint8_t)u16);
         config_machine_save();
         return 1;
+    case 27:
+        config_set_dir_invert(AXIS_X, (val[0] == '1') ? 1U : 0U);
+        config_machine_save();
+        return 1;
     case 30:
         if (!parse_u16(val, &u16)) return 0;
         config_set_spindle_ppr(u16);
@@ -218,8 +228,8 @@ static void print_setting(uint8_t id) {
 static void print_all_settings(void) {
     static const uint8_t ids[] = {
         0, 1, 2, 3,
-        10, 11, 12, 13, 14, 15, 16,
-        20, 21, 22, 23, 24, 25, 26,
+        10, 11, 12, 13, 14, 15, 16, 17,
+        20, 21, 22, 23, 24, 25, 26, 27,
         30, 31
     };
     for (uint8_t i = 0; i < sizeof(ids); i++) {
@@ -242,9 +252,9 @@ static void cmd_help(void) {
     Serial.println(F("$0-$1 async feed min/max mm/min"));
     Serial.println(F("$2-$3 sync feed min/max mm/rev"));
     Serial.println(F("$10-$15 Z motor/ustep/pitch/max/rapid/accel"));
-    Serial.println(F("$16 Z steps/mm (read-only)"));
+    Serial.println(F("$16 Z steps/mm, $17 Z dir invert"));
     Serial.println(F("$20-$25 X motor/ustep/pitch/max/rapid/accel"));
-    Serial.println(F("$26 X steps/mm (read-only)"));
+    Serial.println(F("$26 X steps/mm, $27 X dir invert"));
     Serial.println(F("$30 spindle PPR, $31 buzzer"));
     Serial.println(F("$$ all, $n query, $n=val set, $I info, ? status"));
 }

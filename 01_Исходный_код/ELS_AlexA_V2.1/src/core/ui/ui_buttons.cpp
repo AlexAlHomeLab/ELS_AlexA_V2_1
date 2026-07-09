@@ -71,9 +71,37 @@ void ui_buttons_init(void) {
     memset(&btn_clicks, 0, sizeof(btn_clicks));
 }
 
+static uint8_t joy_feed_dir(uint8_t *axis, int8_t *sign) {
+    uint8_t z = 0;
+    uint8_t x = 0;
+    int8_t zs = 0;
+    int8_t xs = 0;
+
+    if (btn_joy_left.read()) { z = 1; zs = -1; }
+    else if (btn_joy_right.read()) { z = 1; zs = 1; }
+    if (btn_joy_up.read()) { x = 1; xs = 1; }
+    else if (btn_joy_down.read()) { x = 1; xs = -1; }
+    if (z && x) return 0;
+    if (z) { *axis = AXIS_Z; *sign = zs; return 1; }
+    if (x) { *axis = AXIS_X; *sign = xs; return 1; }
+    return 0;
+}
+
 static void log_limit_event(const char *name, VirtButton &btn, uint8_t idx) {
     if (btn.hold()) {
         DBG_INFO("UI", "HOLD", name);
+        if (idx == 0) {
+            uint8_t axis;
+            int8_t sign;
+            uint8_t lim_idx;
+            int32_t target;
+            if (joy_feed_dir(&axis, &sign) &&
+                limits_ui_go_target_dir(axis, sign, &lim_idx, &target)) {
+                DBG_INFO("UI", "LATCH", name);
+                motion_jog_go_limit_latch(lim_idx);
+                return;
+            }
+        }
         limits_ui_on_hold(idx);
         return;
     }

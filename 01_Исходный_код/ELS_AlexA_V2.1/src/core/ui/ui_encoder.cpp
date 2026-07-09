@@ -37,6 +37,14 @@ int32_t ui_encoder_get_mpg_pos(void) {
     return snap;
 }
 
+int32_t ui_encoder_peek_mpg_delta(void) {
+    int32_t snap;
+    cli();
+    snap = hand_count;
+    sei();
+    return snap - hand_count_last;
+}
+
 int32_t ui_encoder_get_mpg_delta(void) {
     int32_t snap;
     cli();

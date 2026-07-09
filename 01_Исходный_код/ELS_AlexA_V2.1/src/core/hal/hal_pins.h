@@ -67,6 +67,10 @@
 #define SUB_INT_PIN A13
 #define SUB_MAN_PIN A14
 #define SUB_EXT_PIN A15
+/* Селектор on-off-on: «отключённый» вход (все 3 не активны) */
+#ifndef SUB_OFF_PIN
+#define SUB_OFF_PIN SUB_MAN_PIN
+#endif
 #define SUBMODE_PORT_RD()   (PINK & 0xE0)
 
 /* --- Селектор режима (позиции 1–8) --- */

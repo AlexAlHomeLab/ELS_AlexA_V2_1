@@ -16,6 +16,7 @@ int32_t motion_jog_get_hand(uint8_t axis);
 void motion_jog_reset_pos(uint8_t axis);
 void motion_jog_zero_axis(uint8_t axis);
 void motion_jog_go_limit(uint8_t idx);
+void motion_jog_go_limit_latch(uint8_t idx);
 
 #ifdef __cplusplus
 }

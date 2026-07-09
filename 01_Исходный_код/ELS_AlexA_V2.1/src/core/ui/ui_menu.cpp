@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MENU_PARAM_COUNT 18
+#define MENU_PARAM_COUNT 20
 #define MENU_EDIT_LEN 8
 
 #define MENU_MODE_BROWSE 0
@@ -48,6 +48,8 @@ static uint16_t edit_x_pitch = 42;
 static uint16_t edit_x_max = 400;
 static uint16_t edit_x_rapid = 1500;
 static uint8_t edit_x_accel = 3;
+static uint8_t edit_z_dir_inv = AXIS_Z_DIR_INVERT_DEFAULT;
+static uint8_t edit_x_dir_inv = AXIS_X_DIR_INVERT_DEFAULT;
 static uint16_t edit_spindle_ppr = 3000;
 static uint8_t edit_buzzer = CONFIG_BUZZER_DEFAULT;
 
@@ -85,6 +87,8 @@ static const ParamDef_t param_def[MENU_PARAM_COUNT] = {
     {"Xacc", PTYPE_UINT, 1, 20},
     {"Spdl", PTYPE_UINT, 100, 10000},
     {"Buzz", PTYPE_BOOL, 0, 1},
+    {"Zinv", PTYPE_BOOL, 0, 1},
+    {"Xinv", PTYPE_BOOL, 0, 1},
 };
 
 static void ui_buzzer_beep(void) {
@@ -118,6 +122,8 @@ static uint8_t *menu_param_ptr_u8(uint8_t idx) {
     case 11: return &edit_x_ustep;
     case 15: return &edit_x_accel;
     case 17: return &edit_buzzer;
+    case 18: return &edit_z_dir_inv;
+    case 19: return &edit_x_dir_inv;
     default: return NULL;
     }
 }
@@ -157,6 +163,8 @@ static void menu_load_values(void) {
     edit_x_max = config_get_max_speed_mm_min(AXIS_X);
     edit_x_rapid = config_get_rapid_speed_mm_min(AXIS_X);
     edit_x_accel = config_get_feed_accel(AXIS_X);
+    edit_z_dir_inv = config_get_dir_invert(AXIS_Z);
+    edit_x_dir_inv = config_get_dir_invert(AXIS_X);
     edit_spindle_ppr = config_get_spindle_ppr();
     edit_buzzer = config_get_buzzer_on();
 }
@@ -517,6 +525,8 @@ static void menu_save_all(void) {
     config_set_max_speed_mm_min(AXIS_X, edit_x_max);
     config_set_rapid_speed_mm_min(AXIS_X, edit_x_rapid);
     config_set_feed_accel(AXIS_X, edit_x_accel);
+    config_set_dir_invert(AXIS_Z, edit_z_dir_inv);
+    config_set_dir_invert(AXIS_X, edit_x_dir_inv);
     config_machine_save();
 
     config_set_buzzer_on(edit_buzzer);

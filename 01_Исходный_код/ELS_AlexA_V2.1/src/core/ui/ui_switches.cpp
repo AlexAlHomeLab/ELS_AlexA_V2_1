@@ -64,10 +64,17 @@ static uint8_t read_mode(void) {
     return latched_mode;
 }
 
+static uint8_t submode_from_pin(uint8_t pin) {
+    if (pin == SUB_INT_PIN) return SUB_INT;
+    if (pin == SUB_EXT_PIN) return SUB_EXT;
+    return SUB_MANUAL;
+}
+
 static uint8_t read_submode(void) {
     if (sw_sub_int.pressing()) latched_submode = SUB_INT;
     else if (sw_sub_man.pressing()) latched_submode = SUB_MANUAL;
     else if (sw_sub_ext.pressing()) latched_submode = SUB_EXT;
+    else latched_submode = submode_from_pin(SUB_OFF_PIN);
     return latched_submode;
 }
 

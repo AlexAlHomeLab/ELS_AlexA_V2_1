@@ -15,6 +15,7 @@ typedef struct {
     uint16_t max_speed;
     uint16_t rapid_speed;
     uint8_t feed_accel;
+    uint8_t dir_invert;
 } AxisCfgRaw_t;
 
 typedef struct {
@@ -25,7 +26,8 @@ typedef struct {
 static MachineCfg_t machine_cfg;
 
 static const MachineCfg_t machine_defaults = {
-    {{400, 2, 42, 400, 1500, 3}, {200, 4, 160, 400, 2000, 3}},
+    {{400, 2, 42, 400, 1500, 3, AXIS_Z_DIR_INVERT_DEFAULT},
+     {200, 4, 160, 400, 2000, 3, AXIS_X_DIR_INVERT_DEFAULT}},
     3000
 };
 
@@ -41,6 +43,7 @@ static uint8_t axis_cfg_validate(const AxisCfgRaw_t *a) {
     if (a->max_speed < 10 || a->max_speed > 5000) return 0;
     if (a->rapid_speed < 10 || a->rapid_speed > 10000) return 0;
     if (a->feed_accel < 1 || a->feed_accel > 20) return 0;
+    if (a->dir_invert > 1) return 0;
     return 1;
 }
 
@@ -133,6 +136,10 @@ uint8_t config_get_feed_accel(uint8_t axis) {
     return axis_cfg(axis)->feed_accel;
 }
 
+uint8_t config_get_dir_invert(uint8_t axis) {
+    return axis_cfg(axis)->dir_invert;
+}
+
 uint16_t config_get_spindle_ppr(void) {
     return machine_cfg.spindle_ppr;
 }
@@ -173,6 +180,10 @@ void config_set_rapid_speed_mm_min(uint8_t axis, uint16_t mm_min) {
 void config_set_feed_accel(uint8_t axis, uint8_t accel) {
     if (accel < 1 || accel > 20) return;
     axis_cfg(axis)->feed_accel = accel;
+}
+
+void config_set_dir_invert(uint8_t axis, uint8_t invert) {
+    axis_cfg(axis)->dir_invert = invert ? 1U : 0U;
 }
 
 void config_set_spindle_ppr(uint16_t ppr) {

@@ -12,6 +12,14 @@
 #define SUB_EXT    1
 #define SUB_INT    2
 
+/* --- Инверсия DIR (0/1), значение по умолчанию --- */
+#ifndef AXIS_X_DIR_INVERT_DEFAULT
+#define AXIS_X_DIR_INVERT_DEFAULT 0
+#endif
+#ifndef AXIS_Z_DIR_INVERT_DEFAULT
+#define AXIS_Z_DIR_INVERT_DEFAULT 0
+#endif
+
 /* --- FSM --- */
 #define ERR_INVALID_TRANSITION 1
 #define ERR_LIMIT              2

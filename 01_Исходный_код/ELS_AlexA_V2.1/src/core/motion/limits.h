@@ -17,6 +17,7 @@ void limits_ui_init(void);
 void limits_ui_on_click(uint8_t idx);
 void limits_ui_on_hold(uint8_t idx);
 uint8_t limits_ui_go_target(uint8_t idx, uint8_t *axis, int32_t *target);
+uint8_t limits_ui_go_target_dir(uint8_t axis, int8_t sign, uint8_t *idx, int32_t *target);
 uint8_t limits_ui_led_on(uint8_t idx);
 void limits_rebase_axis(uint8_t axis, int32_t old_pos);
 

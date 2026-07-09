@@ -15,6 +15,7 @@ extern "C" {
 void ui_encoder_init(void);
 void ui_encoder_poll(void);
 int32_t ui_encoder_get_mpg_pos(void);
+int32_t ui_encoder_peek_mpg_delta(void);
 int32_t ui_encoder_get_mpg_delta(void);
 void ui_encoder_reset_mpg(void);
 

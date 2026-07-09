@@ -24,10 +24,14 @@ static uint8_t go_lim_active;
 static uint8_t go_lim_axis;
 static int32_t go_lim_target;
 static uint8_t go_lim_stop_joy;
+static uint8_t go_lim_latch;
+static uint8_t go_lim_joy_arm;
 
 static void go_limit_stop(void) {
     if (!go_lim_active) return;
     go_lim_active = 0;
+    go_lim_latch = 0;
+    go_lim_joy_arm = 0;
     int32_t pos = dds_get_position(go_lim_axis);
     dds_set_target(go_lim_axis, pos);
     dds_enable(go_lim_axis, 1);
@@ -93,6 +97,8 @@ void motion_jog_init(void) {
     joy_x_on = 0;
     joy_tick_ms = 0;
     go_lim_active = 0;
+    go_lim_latch = 0;
+    go_lim_joy_arm = 0;
     motion_zero_all();
 }
 
@@ -115,6 +121,8 @@ void motion_jog_zero_axis(uint8_t axis) {
     int32_t cur = motion_get_pos_steps(axis);
     if (go_lim_active && go_lim_axis == axis) {
         go_lim_active = 0;
+        go_lim_latch = 0;
+        go_lim_joy_arm = 0;
     }
     limits_rebase_axis(axis, cur);
     motion_set_pos_steps(axis, 0);
@@ -133,6 +141,8 @@ void motion_jog_go_limit(uint8_t idx) {
     go_lim_axis = axis;
     go_lim_target = target;
     go_lim_active = 1;
+    go_lim_latch = 0;
+    go_lim_joy_arm = 1;
 
     dds_set_target(axis, target);
     dds_enable(axis, 1);
@@ -140,8 +150,30 @@ void motion_jog_go_limit(uint8_t idx) {
     DBG_INFO_VAL("JOG", "GOLIM", "tgt", (uint32_t)target);
 }
 
+void motion_jog_go_limit_latch(uint8_t idx) {
+    uint8_t axis;
+    int32_t target;
+
+    if (estop_is_triggered()) return;
+    if (!limits_ui_go_target(idx, &axis, &target)) return;
+    if (motion_get_pos_steps(axis) == target) return;
+
+    go_lim_axis = axis;
+    go_lim_target = target;
+    go_lim_active = 1;
+    go_lim_latch = 1;
+    go_lim_joy_arm = 0;
+
+    dds_set_target(axis, target);
+    dds_enable(axis, 1);
+    dds_set_speed(axis, jog_speed_sps(axis, 0));
+    DBG_INFO_VAL("JOG", "LATCH", "tgt", (uint32_t)target);
+}
+
 void motion_jog_resume(void) {
     go_lim_active = 0;
+    go_lim_latch = 0;
+    go_lim_joy_arm = 0;
     joy_z_on = 0;
     joy_x_on = 0;
     joy_tick_ms = 0;
@@ -155,7 +187,16 @@ void motion_jog_resume(void) {
 static void motion_jog_limit_poll(void) {
     if (!go_lim_active) return;
 
-    if (ui_buttons_feed_joy_click() || ui_buttons_feed_joy_on()) {
+    if (go_lim_latch) {
+        if (!go_lim_joy_arm) {
+            if (!ui_buttons_feed_joy_on()) go_lim_joy_arm = 1;
+        } else if (ui_buttons_feed_joy_on()) {
+            go_limit_stop();
+            go_lim_stop_joy = 1;
+            DBG_INFO("JOG", "LATCH", "stop");
+            return;
+        }
+    } else if (ui_buttons_feed_joy_click() || ui_buttons_feed_joy_on()) {
         go_limit_stop();
         go_lim_stop_joy = 1;
         DBG_INFO("JOG", "GOLIM", "stop");
@@ -169,13 +210,15 @@ static void motion_jog_limit_poll(void) {
     }
 
     dds_set_target(go_lim_axis, go_lim_target);
-    dds_set_speed(go_lim_axis, jog_speed_sps(go_lim_axis, 1));
+    dds_set_speed(go_lim_axis, jog_speed_sps(go_lim_axis, go_lim_latch ? 0 : 1));
     dds_enable(go_lim_axis, 1);
 }
 
 void motion_jog_joy_poll(void) {
     if (estop_is_triggered()) {
         go_lim_active = 0;
+        go_lim_latch = 0;
+        go_lim_joy_arm = 0;
         return;
     }
 
@@ -234,7 +277,7 @@ void motion_jog_poll(void) {
     if (estop_is_triggered()) return;
     if (go_lim_active) return;
 
-    int32_t delta = ui_encoder_get_mpg_delta();
+    int32_t delta = ui_encoder_peek_mpg_delta();
     if (delta == 0) return;
 
     SwitchState_t sw = ui_switches_get_state();
@@ -246,11 +289,16 @@ void motion_jog_poll(void) {
     int32_t steps = jog_steps_from_delta(axis, delta, sw.mpg_scale, btn.joy_rapid);
     if (steps == 0) return;
 
-    hand_pos[axis] += steps;
+    int32_t cur = motion_get_pos_steps(axis);
+    int32_t target = jog_clamp_target(axis, cur + steps, btn.joy_rapid);
+    int32_t actual = target - cur;
+    if (actual == 0) return;
 
-    int32_t target = jog_clamp_target(axis, motion_get_pos_steps(axis) + steps, btn.joy_rapid);
+    (void)ui_encoder_get_mpg_delta();
+    hand_pos[axis] += actual;
+
     dds_set_target(axis, target);
     dds_enable(axis, 1);
     dds_set_speed(axis, jog_speed_sps(axis, btn.joy_rapid));
-    DBG_JOG(steps, axis, target);
+    DBG_JOG(actual, axis, target);
 }

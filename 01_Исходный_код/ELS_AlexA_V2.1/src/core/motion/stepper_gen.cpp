@@ -15,6 +15,15 @@ void dds_init(void) {
     memset(&axis_z, 0, sizeof(AxisState_t));
 }
 
+static void dir_x_set(uint8_t d) {
+    if (config_get_dir_invert(AXIS_X)) d = !d;
+    DIR_X_SET(d);
+}
+static void dir_z_set(uint8_t d) {
+    if (config_get_dir_invert(AXIS_Z)) d = !d;
+    DIR_Z_SET(d);
+}
+
 void dds_set_speed(uint8_t axis, uint32_t steps_per_sec) {
     AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
     a->step_increment = dds_calc_increment(steps_per_sec);
@@ -24,9 +33,9 @@ void dds_set_direction(uint8_t axis, uint8_t dir) {
     AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
     a->direction = dir;
     if (axis == AXIS_X) {
-        DIR_X_SET(dir);
+        dir_x_set(dir);
     } else {
-        DIR_Z_SET(dir);
+        dir_z_set(dir);
     }
 }
 
@@ -35,8 +44,6 @@ void dds_enable(uint8_t axis, uint8_t enable) {
     a->enabled = enable;
 }
 
-static void dir_x_set(uint8_t d) { DIR_X_SET(d); }
-static void dir_z_set(uint8_t d) { DIR_Z_SET(d); }
 static void step_x_on(void) { STEP_X_ON(); }
 static void step_x_off(void) { STEP_X_OFF(); }
 static void step_z_on(void) { STEP_Z_ON(); }
