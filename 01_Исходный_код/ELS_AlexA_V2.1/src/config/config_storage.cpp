@@ -1,4 +1,6 @@
 #include "config_storage.h"
+#include "config_feed.h"
+#include "config_machine.h"
 #include "../core/debug/debug_serial.h"
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -50,20 +52,22 @@ void config_load(void) {
         config_apply(feed, buzzer);
         DBG_INFO_VAL("CFG", "LOAD", "feed", cfg_feed_max);
         DBG_INFO_VAL("CFG", "LOAD", "buzz", cfg_buzzer_on);
-        return;
-    }
-
-    config_apply(CONFIG_FEED_MAX_DEFAULT, CONFIG_BUZZER_DEFAULT);
-
-    if (magic != CONFIG_EEPROM_MAGIC) {
-        config_write_eeprom();
-        DBG_INFO("CFG", "LOAD", "defaults new");
     } else {
-        DBG_INFO_VAL("CFG", "LOAD", "bad raw", magic);
-        DBG_INFO_VAL("CFG", "LOAD", "feed", feed);
-        DBG_INFO_VAL("CFG", "LOAD", "buzz", buzzer);
-        DBG_INFO_VAL("CFG", "LOAD", "sum", checksum);
+        config_apply(CONFIG_FEED_MAX_DEFAULT, CONFIG_BUZZER_DEFAULT);
+
+        if (magic != CONFIG_EEPROM_MAGIC) {
+            config_write_eeprom();
+            DBG_INFO("CFG", "LOAD", "defaults new");
+        } else {
+            DBG_INFO_VAL("CFG", "LOAD", "bad raw", magic);
+            DBG_INFO_VAL("CFG", "LOAD", "feed", feed);
+            DBG_INFO_VAL("CFG", "LOAD", "buzz", buzzer);
+            DBG_INFO_VAL("CFG", "LOAD", "sum", checksum);
+        }
     }
+
+    config_feed_load();
+    config_machine_load();
 }
 
 void config_save(void) {

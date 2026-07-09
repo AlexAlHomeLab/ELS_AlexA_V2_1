@@ -14,8 +14,8 @@
     {
       "type": "wokwi-potentiometer",
       "id": "potFeed",
-      "top": 862.7,
-      "left": 287.8,
+      "top": 478.7,
+      "left": 739,
       "attrs": { "value": "512", "label": "Feed A7" }
     },
     {

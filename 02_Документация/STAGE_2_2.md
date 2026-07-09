@@ -24,6 +24,13 @@
 - Смена масштаба и оси РГИ накопитель **не** сбрасывает
 - Координаты при сбросе накопителя не меняются
 
-## 2.2f — API шпинделя для синхронизации
+## 2.2f — API шпинделя и потенциометр по режимам ✅
 - `spindle_get_count`, `spindle_get_delta`, `spindle_get_dir`
-- Подготовка к этапу 3 (Thread/Sync)
+- Потенциометр: фильтр 16×, инверсия как в 7e2
+- **2 диапазона в EEPROM:** async mm/min (20–400), sync mm/rev (0.02–0.20)
+- **Меню:** aMin/aMax, sMin/sMax; Z/X: stp, uSt, pit, **max, rap, acc**; Spdl, Buzzer
+- `config_machine`: параметры **каждой оси отдельно** (мотор, винт, max/rapid mm/min, accel)
+- **Serial CLI (GRBL $):** `$$`, `$n`, `$n=val`, `$I`, `?` — см. DEBUG.md
+- Async mm/min: Async, Chamfer, Cone, Sphere, Divider, Grind
+- Sync mm/rev: только Sync
+- **Thread:** шаг резьбы из меню/таблицы, пот не используется (`F:---`), jog — async mm/min

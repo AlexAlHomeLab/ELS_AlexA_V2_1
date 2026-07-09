@@ -1,5 +1,6 @@
 #include "limits.h"
 #include "motion_control.h"
+#include "motion_jog.h"
 #include "../debug/debug_serial.h"
 #include "../hal/hal_pins.h"
 #include "../../config/config.h"
@@ -21,6 +22,19 @@ static int32_t limit_pos[4];
 static void limit_beep(void) {
     if (!config_get_buzzer_on()) return;
     tone(BUZZER_PIN, 2500, 40);
+}
+
+static void limit_beep_double(void) {
+    if (!config_get_buzzer_on()) return;
+    tone(BUZZER_PIN, 2500, 40);
+    delay(45);
+    noTone(BUZZER_PIN);
+    delay(80);
+    tone(BUZZER_PIN, 2500, 40);
+}
+
+static uint8_t limit_idx_to_axis(uint8_t idx) {
+    return (idx == 0 || idx == 2) ? AXIS_Z : AXIS_X;
 }
 
 static int32_t read_axis_pos(uint8_t axis) {
@@ -75,8 +89,32 @@ void limits_ui_on_click(uint8_t idx) {
     limit_beep();
 }
 
+void limits_ui_on_hold(uint8_t idx) {
+    if (idx > 3) return;
+    motion_jog_zero_axis(limit_idx_to_axis(idx));
+    DBG_INFO("UI", "ZERO", limit_names[idx]);
+    limit_beep_double();
+}
+
+uint8_t limits_ui_go_target(uint8_t idx, uint8_t *axis, int32_t *target) {
+    if (idx > 3 || !limit_active[idx] || axis == NULL || target == NULL) return 0;
+    *axis = limit_idx_to_axis(idx);
+    *target = limit_pos[idx];
+    return 1;
+}
+
 uint8_t limits_ui_led_on(uint8_t idx) {
     return (idx < 4) ? limit_active[idx] : 0;
+}
+
+void limits_rebase_axis(uint8_t axis, int32_t old_pos) {
+    if (axis == AXIS_Z) {
+        if (limit_active[0]) limit_pos[0] -= old_pos;
+        if (limit_active[2]) limit_pos[2] -= old_pos;
+    } else if (axis == AXIS_X) {
+        if (limit_active[1]) limit_pos[1] -= old_pos;
+        if (limit_active[3]) limit_pos[3] -= old_pos;
+    }
 }
 
 int32_t limits_get_min(uint8_t axis) {

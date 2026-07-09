@@ -31,12 +31,16 @@ typedef struct {
     uint8_t up;
     uint8_t down;
     uint8_t select;
+    uint8_t select_hold;
 } ButtonClicks_t;
 
 void ui_buttons_init(void);
 void ui_buttons_poll(void);
+void ui_buttons_reset_joy(void);
 ButtonState_t ui_buttons_get_state(void);
 ButtonClicks_t ui_buttons_get_clicks(void);
+uint8_t ui_buttons_feed_joy_click(void);
+uint8_t ui_buttons_feed_joy_on(void);
 
 #ifdef __cplusplus
 }

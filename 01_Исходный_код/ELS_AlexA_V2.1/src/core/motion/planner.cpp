@@ -2,6 +2,7 @@
 #include "stepper_gen.h"
 #include "limits.h"
 #include "../../config/config.h"
+#include "../../config/config_machine.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -10,12 +11,11 @@ static uint8_t block_head = 0;
 static uint8_t block_tail = 0;
 static uint8_t block_exec = 0;
 
-static uint32_t mm_min_to_sps(float mm_min, float steps_per_mm) {
-    if (mm_min < 1.0f) mm_min = 100.0f;
-    uint32_t sps = (uint32_t)((mm_min * steps_per_mm) / 60.0f);
-    if (sps < JOG_SPEED_MIN_SPS) sps = JOG_SPEED_MIN_SPS;
-    if (sps > JOG_SPEED_MAX_SPS) sps = JOG_SPEED_MAX_SPS;
-    return sps;
+static uint32_t mm_min_to_sps(uint8_t axis, float mm_min) {
+    if (mm_min < 1.0f) mm_min = 1.0f;
+    float cap = (float)config_get_max_speed_mm_min(axis);
+    if (mm_min > cap) mm_min = cap;
+    return config_mm_min_to_sps(axis, mm_min);
 }
 
 int planner_add_move(float x, float z, float speed) {
@@ -59,13 +59,15 @@ static void planner_start_block(PlannerBlock_t *b) {
         return;
     }
 
-    uint32_t base_sps = mm_min_to_sps(b->speed, STEPS_PER_MM_Z);
+    uint32_t base_sps = mm_min_to_sps(AXIS_Z, b->speed);
 
     dds_set_target(AXIS_X, tx);
     dds_set_target(AXIS_Z, tz);
 
     if (ux > 0) {
         uint32_t sx = (uint32_t)(((uint64_t)base_sps * ux) / um);
+        uint32_t cap_x = mm_min_to_sps(AXIS_X, b->speed);
+        if (sx > cap_x) sx = cap_x;
         if (sx < 1) sx = 1;
         dds_set_speed(AXIS_X, sx);
         dds_enable(AXIS_X, 1);
@@ -75,6 +77,8 @@ static void planner_start_block(PlannerBlock_t *b) {
 
     if (uz > 0) {
         uint32_t sz = (uint32_t)(((uint64_t)base_sps * uz) / um);
+        uint32_t cap_z = mm_min_to_sps(AXIS_Z, b->speed);
+        if (sz > cap_z) sz = cap_z;
         if (sz < 1) sz = 1;
         dds_set_speed(AXIS_Z, sz);
         dds_enable(AXIS_Z, 1);

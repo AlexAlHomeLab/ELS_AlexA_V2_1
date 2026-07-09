@@ -4,17 +4,12 @@
 #include <stdint.h>
 
 #define FIRMWARE_NAME "ELS AlexA V2.1"
-#define FIRMWARE_STAGE "Stage 2.2d"
+#define FIRMWARE_STAGE "Stage 2.2f"
 
 #define PLATFORM_ARDUINO_MEGA 1
 #define CPU_FREQ 16000000UL
 
 #define SERIAL_BAUD 115200
-
-#define STEPS_PER_MM_X 200.0f
-#define STEPS_PER_MM_Z 200.0f
-
-#define SPINDLE_ENCODER_PPR 3000
 
 #define LCD_COLS 20
 #define LCD_ROWS 4
@@ -37,9 +32,12 @@
 
 #define STEP_ISR_PERIOD_US 33
 #define STEP_ISR_FREQ_HZ (1000000UL / STEP_ISR_PERIOD_US)
-#define JOG_SPEED_MIN_SPS 100UL
-#define JOG_SPEED_MAX_SPS 5000UL
 
 #include "config_defs.h"
+#include "config_machine.h"
+
+#define STEPS_PER_MM_X config_get_steps_per_mm(AXIS_X)
+#define STEPS_PER_MM_Z config_get_steps_per_mm(AXIS_Z)
+#define SPINDLE_ENCODER_PPR config_get_spindle_ppr()
 
 #endif

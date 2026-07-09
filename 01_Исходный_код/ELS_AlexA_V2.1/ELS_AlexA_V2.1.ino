@@ -1,11 +1,12 @@
 /*
- * ELS AlexA V2.1 — этап 2.2d: программируемые лимиты
+ * ELS AlexA V2.1 — этап 2.2f: API шпинделя, потенциометр по режимам
  * Arduino Mega 2560, пины из wokwi diagram.json
  */
 
 #include "src/config/config.h"
 #include "src/config/config_storage.h"
 #include "src/core/debug/debug_serial.h"
+#include "src/core/debug/serial_config.h"
 #include "src/core/hal/hal_init.h"
 #include "src/core/hal/hal_interrupts.h"
 #include "src/core/hal/hal_timers.h"
@@ -24,45 +25,80 @@
 #include "src/core/ui/ui_switches.h"
 
 #include <Arduino.h>
+#include <stdio.h>
+#include <string.h>
 
 static unsigned long last_lcd_ms = 0;
 static unsigned long last_pot_ms = 0;
 static char lcd_line[LCD_COLS + 1];
 
-static const char *submode_name(uint8_t sub) {
+static const char *submode_short(uint8_t sub) {
     if (sub == SUB_EXT) return "Ext";
     if (sub == SUB_INT) return "Int";
     return "Man";
 }
 
-static int32_t lcd_axis_coord(uint8_t axis) {
-    return motion_get_pos_steps(axis);
+static void lcd_format_status_line(const char *mode, const char *feed, const char *sub,
+                                   char *buf, size_t len) {
+    (void)len;
+    memset(buf, ' ', LCD_COLS);
+
+    size_t fl = strlen(feed);
+    if (fl > LCD_COLS) fl = LCD_COLS;
+    uint8_t fp = (uint8_t)((LCD_COLS - fl) / 2U);
+    memcpy(buf + fp, feed, fl);
+
+    size_t ml = strlen(mode);
+    uint8_t max_ml = fp > 0U ? fp : 1U;
+    if (ml > max_ml) ml = max_ml;
+    memcpy(buf, mode, ml);
+
+    size_t sl = strlen(sub);
+    if (sl > 3U) sl = 3U;
+    memcpy(buf + LCD_COLS - 3U, sub, sl);
+
+    buf[LCD_COLS] = 0;
+}
+
+static int lcd_format_coord(char *dst, size_t len, char axis, long val) {
+    if (val < 0) {
+        return snprintf(dst, len, "%c-%07ld", axis, -val);
+    }
+    return snprintf(dst, len, "%c %07ld", axis, val);
+}
+
+static void lcd_format_coords_line(char *buf, size_t len) {
+    char xp[10];
+    char zp[10];
+    lcd_format_coord(xp, sizeof(xp), 'X', (long)motion_get_pos_steps(AXIS_X));
+    lcd_format_coord(zp, sizeof(zp), 'Z', (long)motion_get_pos_steps(AXIS_Z));
+    snprintf(buf, len, "%s %s", xp, zp);
 }
 
 static void update_main_lcd(void) {
     SwitchState_t sw = ui_switches_get_state();
-    uint8_t feed_pct = ui_pot_get_percent();
-    uint8_t feed_max = config_get_feed_max();
-    uint8_t feed_show = (uint8_t)((feed_pct * feed_max) / 100U);
+    uint8_t mode = fsm_manager_get_mode();
+    char feed_txt[16];
+    char mpg_txt[16];
 
-    snprintf(lcd_line, sizeof(lcd_line), "M:%u %s Mx:%u",
-             sw.mode, submode_name(sw.submode), config_get_feed_max());
-    ui_lcd_set_line(1, lcd_line);
+    ui_pot_feed_format(feed_txt, sizeof(feed_txt), mode);
+    lcd_format_status_line(ui_switches_get_mode_name(sw.mode),
+                           feed_txt,
+                           submode_short(sw.submode),
+                           lcd_line, sizeof(lcd_line));
+    ui_lcd_set_line(0, lcd_line);
 
     char axis = (sw.mpg_axis == AXIS_X) ? 'X' : 'Z';
-    snprintf(lcd_line, sizeof(lcd_line), "MPG %c %+ld F:%u%%",
-             axis, (long)motion_jog_get_hand(sw.mpg_axis), feed_show);
-    ui_lcd_set_line(2, lcd_line);
+    snprintf(mpg_txt, sizeof(mpg_txt), "MPG %c %+ld", axis, (long)motion_jog_get_hand(sw.mpg_axis));
+    ui_lcd_set_line(1, mpg_txt);
+    ui_lcd_clear_line(2);
 
-    snprintf(lcd_line, sizeof(lcd_line), "X:%+ld Z:%+ld RPM:%lu",
-             (long)lcd_axis_coord(AXIS_X),
-             (long)lcd_axis_coord(AXIS_Z),
-             (unsigned long)spindle_get_rpm());
+    lcd_format_coords_line(lcd_line, sizeof(lcd_line));
     ui_lcd_set_line(3, lcd_line);
+    ui_lcd_clear_cursor();
 }
 
 static void update_lcd(void) {
-    ui_lcd_set_line(0, FIRMWARE_NAME);
     if (ui_menu_is_active()) {
         ui_menu_lcd();
     } else {
@@ -73,6 +109,7 @@ static void update_lcd(void) {
 void setup() {
     hal_init();
     debug_serial_init(SERIAL_BAUD);
+    serial_config_init();
 
     debug_serial_println("");
     debug_serial_println(FIRMWARE_NAME " " FIRMWARE_STAGE " Starting...");
@@ -96,7 +133,7 @@ void setup() {
     update_lcd();
     ui_lcd_update();
 
-    DBG_INFO("SYS", "INIT", "Stage 2.2d ready");
+    DBG_INFO("SYS", "INIT", "Stage 2.2f ready");
 }
 
 void loop() {
@@ -105,9 +142,10 @@ void loop() {
     ui_switches_poll();
     fsm_manager_poll();
     ui_encoder_poll();
-    fsm_manager_process();
     ui_menu_poll();
+    fsm_manager_process();
     spindle_poll();
+    serial_config_poll();
 
     if (millis() - last_pot_ms >= POT_READ_MS) {
         if (ui_pot_poll()) {

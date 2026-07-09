@@ -103,7 +103,7 @@ void fsm_manager_process(void) {
 
     planner_process();
 
-    if (st == STATE_MANUAL && !planner_is_busy()) {
+    if (st == STATE_MANUAL) {
         motion_jog_joy_poll();
         motion_jog_poll();
     }
