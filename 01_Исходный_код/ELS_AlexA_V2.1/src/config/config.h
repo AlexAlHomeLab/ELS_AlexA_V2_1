@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define FIRMWARE_NAME "ELS AlexA V2.1"
-#define FIRMWARE_STAGE "Stage 2"
+#define FIRMWARE_STAGE "Stage 2.2d"
 
 #define PLATFORM_ARDUINO_MEGA 1
 #define CPU_FREQ 16000000UL

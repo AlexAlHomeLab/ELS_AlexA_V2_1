@@ -41,6 +41,8 @@ uint8_t fsm_validate_transition(State_t from, State_t to);
 void fsm_transition(State_t new_state);
 State_t fsm_get_state(void);
 void fsm_error(uint8_t error_code);
+void fsm_force_error(void);
+void fsm_recover(void);
 void fsm_emergency_stop(void);
 void fsm_set_mode(uint8_t mode);
 void fsm_set_submode(uint8_t submode);

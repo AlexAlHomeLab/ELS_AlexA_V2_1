@@ -28,6 +28,7 @@ PlannerBlock_t* planner_get_next(void);
 void planner_stop_all(void);
 void planner_process(void);
 uint8_t planner_is_empty(void);
+uint8_t planner_is_busy(void);
 
 /* --- Параметры --- */
 void planner_set_acceleration(float accel);

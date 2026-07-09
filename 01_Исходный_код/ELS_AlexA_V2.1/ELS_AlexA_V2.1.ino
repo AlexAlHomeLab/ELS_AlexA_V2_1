@@ -1,5 +1,5 @@
 /*
- * ELS AlexA V2.1 — этап 2.1: MPG jog + DDS
+ * ELS AlexA V2.1 — этап 2.2d: программируемые лимиты
  * Arduino Mega 2560, пины из wokwi diagram.json
  */
 
@@ -9,6 +9,7 @@
 #include "src/core/hal/hal_init.h"
 #include "src/core/hal/hal_interrupts.h"
 #include "src/core/hal/hal_timers.h"
+#include "src/core/fsm/fsm_manager.h"
 #include "src/core/motion/limits.h"
 #include "src/core/motion/motion_control.h"
 #include "src/core/motion/motion_jog.h"
@@ -35,7 +36,7 @@ static const char *submode_name(uint8_t sub) {
 }
 
 static int32_t lcd_axis_coord(uint8_t axis) {
-    return motion_jog_get_pos(axis);
+    return motion_get_pos_steps(axis);
 }
 
 static void update_main_lcd(void) {
@@ -88,22 +89,23 @@ void setup() {
     ui_pot_init();
     ui_encoder_init();
     ui_menu_init();
+    fsm_manager_init();
     spindle_init();
     encoder_interrupts_init();
 
     update_lcd();
     ui_lcd_update();
 
-    DBG_INFO("SYS", "INIT", "Stage 2 jog ready");
+    DBG_INFO("SYS", "INIT", "Stage 2.2d ready");
 }
 
 void loop() {
     estop_check();
     ui_buttons_poll();
     ui_switches_poll();
+    fsm_manager_poll();
     ui_encoder_poll();
-    motion_jog_joy_poll();
-    motion_jog_poll();
+    fsm_manager_process();
     ui_menu_poll();
     spindle_poll();
 

@@ -1,56 +1,140 @@
 #include "limits.h"
+#include "motion_control.h"
 #include "../debug/debug_serial.h"
 #include "../hal/hal_pins.h"
 #include "../../config/config.h"
+#include "../../config/config_storage.h"
 #include <Arduino.h>
+
+#define LIMIT_OFF_MIN (-2000000L)
+#define LIMIT_OFF_MAX  2000000L
 
 static const uint8_t limit_led_pins[4] = {
     LED_LIMIT_LEFT_PIN, LED_LIMIT_FRONT_PIN, LED_LIMIT_RIGHT_PIN, LED_LIMIT_REAR_PIN
 };
 static const char *limit_names[4] = {"LimL", "LimF", "LimR", "LimRe"};
-static uint8_t limit_led_on[4];
 
-static int32_t limit_x_min = -10000;
-static int32_t limit_x_max = 10000;
-static int32_t limit_z_min = -10000;
-static int32_t limit_z_max = 10000;
+/* LimL/LimR — Z, LimF/LimRe — X (как 7e2) */
+static uint8_t limit_active[4];
+static int32_t limit_pos[4];
+
+static void limit_beep(void) {
+    if (!config_get_buzzer_on()) return;
+    tone(BUZZER_PIN, 2500, 40);
+}
+
+static int32_t read_axis_pos(uint8_t axis) {
+    return motion_get_pos_steps(axis);
+}
 
 void limits_ui_init(void) {
     for (uint8_t i = 0; i < 4; i++) {
-        limit_led_on[i] = 0;
+        limit_active[i] = 0;
+        limit_pos[i] = 0;
         LIMIT_LED_OFF(limit_led_pins[i]);
     }
 }
 
-void limits_ui_on_click(uint8_t idx) {
-    if (idx > 3) return;
-    limit_led_on[idx] = !limit_led_on[idx];
-    if (limit_led_on[idx]) {
-        LIMIT_LED_ON(limit_led_pins[idx]);
-        DBG_INFO("UI", "LIM", limit_names[idx]);
-    } else {
-        LIMIT_LED_OFF(limit_led_pins[idx]);
-        DBG_INFO("UI", "LIM", "off");
+static uint8_t can_set_limit(uint8_t idx, int32_t pos) {
+    if (idx == 0) {
+        if (limit_active[2] && pos >= limit_pos[2]) return 0;
+    } else if (idx == 2) {
+        if (limit_active[0] && pos <= limit_pos[0]) return 0;
+    } else if (idx == 1) {
+        if (limit_active[3] && pos <= limit_pos[3]) return 0;
+    } else if (idx == 3) {
+        if (limit_active[1] && pos >= limit_pos[1]) return 0;
     }
-}
-
-uint8_t limits_ui_led_on(uint8_t idx) {
-    return (idx < 4) ? limit_led_on[idx] : 0;
-}
-
-uint8_t limits_check(int32_t x_pos, int32_t z_pos) {
-    if (x_pos < limit_x_min || x_pos > limit_x_max) return 0;
-    if (z_pos < limit_z_min || z_pos > limit_z_max) return 0;
     return 1;
 }
 
-void limits_set(uint8_t axis, int32_t value, uint8_t is_max) {
-    if (axis == AXIS_X) {
-        if (is_max) limit_x_max = value;
-        else limit_x_min = value;
+void limits_ui_on_click(uint8_t idx) {
+    if (idx > 3) return;
+
+    if (limit_active[idx]) {
+        limit_active[idx] = 0;
+        LIMIT_LED_OFF(limit_led_pins[idx]);
+        DBG_INFO("UI", "LIM", "off");
+        limit_beep();
+        return;
+    }
+
+    int32_t pos = 0;
+    if (idx == 0 || idx == 2) {
+        pos = read_axis_pos(AXIS_Z);
     } else {
-        if (is_max) limit_z_max = value;
-        else limit_z_min = value;
+        pos = read_axis_pos(AXIS_X);
+    }
+
+    if (!can_set_limit(idx, pos)) return;
+
+    limit_active[idx] = 1;
+    limit_pos[idx] = pos;
+    LIMIT_LED_ON(limit_led_pins[idx]);
+    DBG_INFO_VAL("UI", "LIM", limit_names[idx], (uint32_t)pos);
+    limit_beep();
+}
+
+uint8_t limits_ui_led_on(uint8_t idx) {
+    return (idx < 4) ? limit_active[idx] : 0;
+}
+
+int32_t limits_get_min(uint8_t axis) {
+    if (axis == AXIS_Z) {
+        return limit_active[0] ? limit_pos[0] : LIMIT_OFF_MIN;
+    }
+    return limit_active[3] ? limit_pos[3] : LIMIT_OFF_MIN;
+}
+
+int32_t limits_get_max(uint8_t axis) {
+    if (axis == AXIS_Z) {
+        return limit_active[2] ? limit_pos[2] : LIMIT_OFF_MAX;
+    }
+    return limit_active[1] ? limit_pos[1] : LIMIT_OFF_MAX;
+}
+
+uint8_t limits_is_active(uint8_t axis) {
+    if (axis == AXIS_Z) {
+        return limit_active[0] || limit_active[2];
+    }
+    return limit_active[1] || limit_active[3];
+}
+
+uint8_t limits_check(int32_t x_pos, int32_t z_pos) {
+    if (x_pos < limits_get_min(AXIS_X) || x_pos > limits_get_max(AXIS_X)) return 0;
+    if (z_pos < limits_get_min(AXIS_Z) || z_pos > limits_get_max(AXIS_Z)) return 0;
+    return 1;
+}
+
+int32_t limits_clamp_steps(uint8_t axis, int32_t target) {
+    int32_t mn = limits_get_min(axis);
+    int32_t mx = limits_get_max(axis);
+    if (target < mn) return mn;
+    if (target > mx) return mx;
+    return target;
+}
+
+void limits_set(uint8_t axis, int32_t value, uint8_t is_max) {
+    if (axis == AXIS_Z) {
+        if (is_max) {
+            limit_active[2] = 1;
+            limit_pos[2] = value;
+            LIMIT_LED_ON(limit_led_pins[2]);
+        } else {
+            limit_active[0] = 1;
+            limit_pos[0] = value;
+            LIMIT_LED_ON(limit_led_pins[0]);
+        }
+    } else {
+        if (is_max) {
+            limit_active[1] = 1;
+            limit_pos[1] = value;
+            LIMIT_LED_ON(limit_led_pins[1]);
+        } else {
+            limit_active[3] = 1;
+            limit_pos[3] = value;
+            LIMIT_LED_ON(limit_led_pins[3]);
+        }
     }
 }
 
@@ -65,17 +149,4 @@ uint8_t limits_hardware_check(void) {
 void limits_set_axis(uint8_t axis, uint8_t is_min) {
     (void)axis;
     (void)is_min;
-}
-
-int32_t limits_get_min(uint8_t axis) {
-    return (axis == AXIS_X) ? limit_x_min : limit_z_min;
-}
-
-int32_t limits_get_max(uint8_t axis) {
-    return (axis == AXIS_X) ? limit_x_max : limit_z_max;
-}
-
-uint8_t limits_is_active(uint8_t axis) {
-    (void)axis;
-    return 0;
 }

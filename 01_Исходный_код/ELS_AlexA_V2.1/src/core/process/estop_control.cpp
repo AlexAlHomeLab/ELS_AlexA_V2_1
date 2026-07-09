@@ -1,4 +1,5 @@
 #include "estop_control.h"
+#include "../fsm/fsm_core.h"
 #include "../hal/hal_pins.h"
 #include "../hal/hal_ports.h"
 #include "../motion/motion_control.h"
@@ -20,7 +21,7 @@ void estop_trigger(void) {
     if (estop_triggered) return;
     estop_triggered = 1;
     estop_state = 1;
-    motion_stop();
+    fsm_force_error();
     analogWrite(SPINDLE_PWM_PIN, 0);
     for (int i = 0; i < 5; i++) {
         digitalWrite(BUZZER_PIN, HIGH);
@@ -33,6 +34,7 @@ void estop_trigger(void) {
 void estop_reset(void) {
     estop_triggered = 0;
     estop_state = 0;
+    fsm_recover();
 }
 
 uint8_t estop_get_state(void) {

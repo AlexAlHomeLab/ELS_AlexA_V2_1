@@ -1,4 +1,5 @@
 #include "fsm_core.h"
+#include "../motion/motion_control.h"
 #include "../../config/config.h"
 
 static State_t current_state = STATE_IDLE;
@@ -13,7 +14,8 @@ static const Transition_t transitions[] = {
     {STATE_PAUSED, STATE_CYCLE, 3},
     {STATE_MANUAL, STATE_IDLE, 4},
     {STATE_ANY, STATE_ERROR, 5},
-    {STATE_ERROR, STATE_IDLE, 6}
+    {STATE_ERROR, STATE_IDLE, 6},
+    {STATE_ERROR, STATE_MANUAL, 7},
 };
 
 uint8_t fsm_validate_transition(State_t from, State_t to) {
@@ -43,11 +45,23 @@ State_t fsm_get_state(void) {
 
 void fsm_error(uint8_t error_code) {
     (void)error_code;
+    fsm_force_error();
+}
+
+void fsm_force_error(void) {
+    if (current_state == STATE_ERROR) return;
+    previous_state = current_state;
     current_state = STATE_ERROR;
     fsm_emergency_stop();
 }
 
+void fsm_recover(void) {
+    if (current_state != STATE_ERROR) return;
+    fsm_transition(STATE_MANUAL);
+}
+
 void fsm_emergency_stop(void) {
+    motion_stop();
 }
 
 void fsm_set_mode(uint8_t mode) {

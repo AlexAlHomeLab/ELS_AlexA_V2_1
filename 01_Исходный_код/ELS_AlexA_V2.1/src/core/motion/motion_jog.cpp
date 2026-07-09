@@ -1,9 +1,11 @@
 #include "motion_jog.h"
+#include "motion_control.h"
 #include "stepper_gen.h"
 #include "../../config/config.h"
 #include "../../config/config_storage.h"
 #include "../debug/debug_serial.h"
 #include "../process/estop_control.h"
+#include "../motion/limits.h"
 #include "../ui/ui_buttons.h"
 #include "../ui/ui_encoder.h"
 #include "../ui/ui_pot.h"
@@ -13,20 +15,14 @@
 
 #define JOY_STEP_MS 20UL
 
-/* hand_pos — накопитель РГИ (сброс не меняет координаты); координаты = DDS */
+/* hand_pos — накопитель РГИ; сброс только при старте джойстика по оси */
 static int32_t hand_pos[2];
 static uint8_t joy_z_on;
 static uint8_t joy_x_on;
 static unsigned long joy_tick_ms;
 
-static int32_t axis_cur_pos(uint8_t axis) {
-    if (dds_at_target(axis)) {
-        return dds_get_position(axis);
-    }
-    return dds_get_target(axis);
-}
-
 static void hand_reset_axis(uint8_t axis) {
+    /* только джойстик; смена масштаба/оси РГИ hand_pos не трогает */
     hand_pos[axis] = 0;
     ui_encoder_reset_mpg();
 }
@@ -81,15 +77,11 @@ void motion_jog_init(void) {
     joy_z_on = 0;
     joy_x_on = 0;
     joy_tick_ms = 0;
-    dds_set_position(AXIS_X, 0);
-    dds_set_position(AXIS_Z, 0);
-    dds_set_target(AXIS_X, 0);
-    dds_set_target(AXIS_Z, 0);
+    motion_zero_all();
 }
 
 int32_t motion_jog_get_pos(uint8_t axis) {
-    if (axis > AXIS_Z) return 0;
-    return axis_cur_pos(axis);
+    return motion_get_pos_steps(axis);
 }
 
 int32_t motion_jog_get_hand(uint8_t axis) {
@@ -134,13 +126,15 @@ void motion_jog_joy_poll(void) {
     int32_t chunk_x = joy_chunk(AXIS_X, btn.joy_rapid);
 
     if (z_on) {
-        int32_t target = axis_cur_pos(AXIS_Z) + z_sign * chunk_z;
+        int32_t target = limits_clamp_steps(AXIS_Z,
+            motion_get_pos_steps(AXIS_Z) + z_sign * chunk_z);
         dds_set_target(AXIS_Z, target);
         dds_enable(AXIS_Z, 1);
         dds_set_speed(AXIS_Z, jog_speed_sps(AXIS_Z));
     }
     if (x_on) {
-        int32_t target = axis_cur_pos(AXIS_X) + x_sign * chunk_x;
+        int32_t target = limits_clamp_steps(AXIS_X,
+            motion_get_pos_steps(AXIS_X) + x_sign * chunk_x);
         dds_set_target(AXIS_X, target);
         dds_enable(AXIS_X, 1);
         dds_set_speed(AXIS_X, jog_speed_sps(AXIS_X));
@@ -164,7 +158,7 @@ void motion_jog_poll(void) {
 
     hand_pos[axis] += steps;
 
-    int32_t target = axis_cur_pos(axis) + steps;
+    int32_t target = limits_clamp_steps(axis, motion_get_pos_steps(axis) + steps);
     dds_set_target(axis, target);
     dds_enable(axis, 1);
     dds_set_speed(axis, jog_speed_sps(axis));

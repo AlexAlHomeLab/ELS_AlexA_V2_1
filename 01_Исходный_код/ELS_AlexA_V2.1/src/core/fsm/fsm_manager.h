@@ -13,6 +13,9 @@ extern "C" {
 
 
 void fsm_manager_set_mode(uint8_t mode);
+void fsm_manager_set_submode(uint8_t submode);
+void fsm_manager_init(void);
+void fsm_manager_poll(void);
 void fsm_manager_enter_mode(uint8_t mode);
 void fsm_manager_exit_mode(uint8_t mode);
 void fsm_manager_process(void);
