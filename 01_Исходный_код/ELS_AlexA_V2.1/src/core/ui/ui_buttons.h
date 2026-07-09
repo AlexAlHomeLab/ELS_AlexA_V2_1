@@ -25,9 +25,18 @@ typedef struct {
     uint8_t limit_rear;
 } ButtonState_t;
 
+typedef struct {
+    uint8_t left;
+    uint8_t right;
+    uint8_t up;
+    uint8_t down;
+    uint8_t select;
+} ButtonClicks_t;
+
 void ui_buttons_init(void);
 void ui_buttons_poll(void);
 ButtonState_t ui_buttons_get_state(void);
+ButtonClicks_t ui_buttons_get_clicks(void);
 
 #ifdef __cplusplus
 }

@@ -3,14 +3,10 @@
 #include "../hal/hal_pins.h"
 #include "../motion/limits.h"
 #include "ui_buttons.h"
+#include "ui_io.h"
 
 #include <Arduino.h>
 #include <string.h>
-
-bool EB_read(uint8_t pin) { return digitalRead(pin); }
-void EB_mode(uint8_t pin, uint8_t mode) { pinMode(pin, mode); }
-uint32_t EB_uptime() { return millis(); }
-
 #include <EncButton.h>
 
 static ButtonT<BTN_LEFT_PIN> btn_left;
@@ -29,9 +25,20 @@ static ButtonT<LIMIT_RIGHT_PIN> btn_limit_right;
 static ButtonT<LIMIT_REAR_PIN> btn_limit_rear;
 
 static ButtonState_t btn_state;
+static ButtonClicks_t btn_clicks;
 
 static void set_btn_level(VirtButton &btn) {
     btn.setBtnLevel(LOW);
+}
+
+static void on_menu_click(VirtButton &btn, uint8_t *flag, const char *name) {
+    if (btn.click()) {
+        *flag = 1;
+        DBG_INFO("UI", "BTN", name);
+    }
+    if (btn.hold()) {
+        DBG_INFO("UI", "HOLD", name);
+    }
 }
 
 static void log_btn_event(const char *name, VirtButton &btn) {
@@ -59,6 +66,7 @@ void ui_buttons_init(void) {
     set_btn_level(btn_limit_right);
     set_btn_level(btn_limit_rear);
     memset(&btn_state, 0, sizeof(btn_state));
+    memset(&btn_clicks, 0, sizeof(btn_clicks));
 }
 
 static void log_limit_event(const char *name, VirtButton &btn, uint8_t idx) {
@@ -72,6 +80,8 @@ static void log_limit_event(const char *name, VirtButton &btn, uint8_t idx) {
 }
 
 void ui_buttons_poll(void) {
+    memset(&btn_clicks, 0, sizeof(btn_clicks));
+
     btn_left.tick();
     btn_right.tick();
     btn_up.tick();
@@ -87,11 +97,11 @@ void ui_buttons_poll(void) {
     btn_limit_right.tick();
     btn_limit_rear.tick();
 
-    log_btn_event("Left", btn_left);
-    log_btn_event("Right", btn_right);
-    log_btn_event("Up", btn_up);
-    log_btn_event("Down", btn_down);
-    log_btn_event("Select", btn_select);
+    on_menu_click(btn_left, &btn_clicks.left, "Left");
+    on_menu_click(btn_right, &btn_clicks.right, "Right");
+    on_menu_click(btn_up, &btn_clicks.up, "Up");
+    on_menu_click(btn_down, &btn_clicks.down, "Down");
+    on_menu_click(btn_select, &btn_clicks.select, "Select");
     log_btn_event("JoyL", btn_joy_left);
     log_btn_event("JoyR", btn_joy_right);
     log_btn_event("JoyU", btn_joy_up);
@@ -121,4 +131,8 @@ void ui_buttons_poll(void) {
 
 ButtonState_t ui_buttons_get_state(void) {
     return btn_state;
+}
+
+ButtonClicks_t ui_buttons_get_clicks(void) {
+    return btn_clicks;
 }

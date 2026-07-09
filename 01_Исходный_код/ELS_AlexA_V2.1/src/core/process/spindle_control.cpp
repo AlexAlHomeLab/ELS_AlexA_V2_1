@@ -19,26 +19,34 @@ void spindle_init(void) {
     spindle_state.last_encoder_count = 0;
     spindle_state.phase = 0;
     pinMode(SPINDLE_PWM_PIN, OUTPUT);
-    pinMode(ENC_SPINDLE_A_PIN, INPUT_PULLUP);
-    pinMode(ENC_SPINDLE_B_PIN, INPUT_PULLUP);
+    ENC_PORTD_INIT();
 }
 
-static void spindle_encoder_poll(void) {
-    static uint8_t last_a = 0;
-    uint8_t a = digitalRead(ENC_SPINDLE_A_PIN);
-    uint8_t b = digitalRead(ENC_SPINDLE_B_PIN);
-    if (a != last_a) {
-        spindle_encoder_process(a, b);
-        last_a = a;
+void spindle_encoder_isr_step(void) {
+    if (!ENC_SPINDLE_B_RD()) {
+        if (!ENC_SPINDLE_A_RD()) {
+            spindle_state.direction = 0;
+            spindle_encoder_count++;
+        } else {
+            spindle_state.direction = 1;
+            spindle_encoder_count--;
+        }
+    } else {
+        if (!ENC_SPINDLE_A_RD()) {
+            spindle_state.direction = 1;
+            spindle_encoder_count--;
+        } else {
+            spindle_state.direction = 0;
+            spindle_encoder_count++;
+        }
     }
-    (void)b;
 }
 
 void spindle_poll(void) {
     static unsigned long last_ms = 0;
     static uint32_t last_count = 0;
 
-    spindle_encoder_poll();
+    spindle_state.encoder_count = spindle_encoder_count;
 
     unsigned long now = millis();
     if (now - last_ms < 1000UL) return;
@@ -79,15 +87,19 @@ void spindle_stop(void) {
     spindle_state.pwm = 0;
 }
 
+void spindle_encoder_isr_tick(void) {
+    spindle_encoder_isr_step();
+}
+
 void spindle_encoder_handler(void) {
-    spindle_encoder_count++;
+    spindle_encoder_isr_step();
     spindle_state.encoder_count = spindle_encoder_count;
 }
 
 void spindle_encoder_process(uint8_t a, uint8_t b) {
     (void)a;
     (void)b;
-    spindle_encoder_count++;
+    spindle_encoder_isr_step();
     spindle_state.encoder_count = spindle_encoder_count;
 }
 

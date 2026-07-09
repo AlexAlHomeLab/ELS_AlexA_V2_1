@@ -1,13 +1,17 @@
 #include "estop_control.h"
 #include "../hal/hal_pins.h"
+#include "../hal/hal_ports.h"
+#include "../motion/motion_control.h"
 #include "../motion/planner.h"
 #include <Arduino.h>
 
 static uint8_t estop_state = 0;
 static uint8_t estop_triggered = 0;
 
+#include <avr/io.h>
+
 void estop_check(void) {
-    if (digitalRead(ESTOP_BTN_PIN) == LOW) {
+    if (((PINF >> 4) & 1) == 0) {
         estop_trigger();
     }
 }
@@ -16,7 +20,7 @@ void estop_trigger(void) {
     if (estop_triggered) return;
     estop_triggered = 1;
     estop_state = 1;
-    planner_stop_all();
+    motion_stop();
     analogWrite(SPINDLE_PWM_PIN, 0);
     for (int i = 0; i < 5; i++) {
         digitalWrite(BUZZER_PIN, HIGH);

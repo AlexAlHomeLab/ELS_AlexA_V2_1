@@ -252,36 +252,36 @@
     {
       "type": "wokwi-pushbutton",
       "id": "btnDown",
-      "top": -109,
-      "left": 28.8,
+      "top": -118.6,
+      "left": 9.6,
       "attrs": { "color": "green", "bounce": "0", "label": "Down A0", "key": "s" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnUp",
-      "top": -99.4,
-      "left": -48,
+      "top": -118.6,
+      "left": -57.6,
       "attrs": { "color": "green", "bounce": "0", "label": "Up A1", "key": "w" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnRight",
-      "top": -109,
+      "top": -118.6,
       "left": -124.8,
       "attrs": { "color": "green", "bounce": "0", "label": "Right A2", "key": "d" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnLeft",
-      "top": -109,
+      "top": -118.6,
       "left": -201.6,
       "attrs": { "color": "green", "bounce": "0", "label": "Left A3", "key": "a" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnSel",
-      "top": -109,
-      "left": 96,
+      "top": -118.6,
+      "left": 86.4,
       "attrs": { "color": "green", "bounce": "0", "label": "Select A4", "key": "e" }
     },
     {

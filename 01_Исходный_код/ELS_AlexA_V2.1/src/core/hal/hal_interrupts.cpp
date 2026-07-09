@@ -5,36 +5,32 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
 
+static void mpg_interrupts_init(void) {
+    EICRA |= (1 << ISC20);
+    EIFR = (1 << INTF2);
+    EIMSK |= (1 << INT2);
+}
+
 void encoder_interrupts_init(void) {
+    EICRA |= (1 << ISC00);
+    EIFR = (1 << INTF0);
+    EIMSK |= (1 << INT0);
+    mpg_interrupts_init();
 }
 
-void mpg_interrupts_init(void) {
+void mpg_int_enable(void) {
+    EIFR = (1 << INTF2);
+    EIMSK |= (1 << INT2);
 }
 
-void buttons_interrupts_init(void) {
-    PCICR |= (1 << PCIE2);
-    PCMSK2 |= (1 << PCINT18) | (1 << PCINT19);
+void mpg_int_disable(void) {
+    EIMSK &= ~(1 << INT2);
 }
 
-void buttons_scan(void) {
+ISR(INT0_vect) {
+    spindle_encoder_isr_step();
 }
 
-ISR(INT3_vect) {
-    spindle_encoder_process((PIND >> PD0) & 1, (PIND >> PD1) & 1);
-}
-
-ISR(INT4_vect) {
-    spindle_encoder_process((PIND >> PD0) & 1, (PIND >> PD1) & 1);
-}
-
-ISR(INT5_vect) {
-    mpg_process((PINF >> PF4) & 1, (PINF >> PF5) & 1);
-}
-
-ISR(INT6_vect) {
-    mpg_process((PINF >> PF4) & 1, (PINF >> PF5) & 1);
-}
-
-ISR(PCINT2_vect) {
-    buttons_scan();
+ISR(INT2_vect) {
+    hand_mpg_isr_step();
 }

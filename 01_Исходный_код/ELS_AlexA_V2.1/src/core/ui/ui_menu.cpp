@@ -1,69 +1,109 @@
 #include "ui_menu.h"
-#include "ui_lcd.h"
 #include "ui_buttons.h"
-#include "ui_pot.h"
-#include "../fsm/fsm_core.h"
+#include "ui_lcd.h"
 #include "../../config/config.h"
+#include "../../config/config_storage.h"
+#include "../debug/debug_serial.h"
+#include "../hal/hal_pins.h"
+#include <Arduino.h>
+#include <stdio.h>
 
-static const char *mode_names[] = {
-    "ASYNC", "SYNC", "CHAMFER", "THREAD", "CONE L",
-    "CONE R", "DIVIDER", "SPHERE", "GRIND"
-};
+static uint8_t menu_active = 0;
+static uint8_t param_idx = 0;
+static uint8_t edit_feed_max = CONFIG_FEED_MAX_DEFAULT;
+static uint8_t edit_buzzer = CONFIG_BUZZER_DEFAULT;
+static uint8_t open_hold_latched = 0;
+static uint8_t cancel_hold_latched = 0;
 
-static uint8_t current_mode = 0;
-static uint8_t current_submode = SUB_MANUAL;
+static void ui_buzzer_beep(void) {
+    if (!edit_buzzer) return;
+    tone(BUZZER_PIN, 2500, 40);
+}
 
 void ui_menu_init(void) {
-    ui_menu_update();
+    menu_active = 0;
+    param_idx = 0;
+    edit_feed_max = config_get_feed_max();
+    edit_buzzer = config_get_buzzer_on();
 }
 
-void ui_menu_update(void) {
-    ui_lcd_set_line(0, "ELS AlexA V2.1");
-    ui_lcd_set_line(1, mode_names[current_mode]);
-    switch (current_submode) {
-        case SUB_MANUAL: ui_lcd_set_line(2, "MAN"); break;
-        case SUB_EXT: ui_lcd_set_line(2, "EXT"); break;
-        case SUB_INT: ui_lcd_set_line(2, "INT"); break;
-        default: ui_lcd_set_line(2, "---"); break;
-    }
+uint8_t ui_menu_is_active(void) {
+    return menu_active;
 }
 
-void ui_menu_handle_navigation(void) {
-    ButtonState_t btn = ui_buttons_get_state();
+void ui_menu_lcd(void) {
+    char line[LCD_COLS + 1];
 
-    if (btn.left) {
-        current_mode = (current_mode > 0) ? current_mode - 1 : 8;
-        fsm_set_mode(current_mode);
-        ui_menu_update();
-    }
-    if (btn.right) {
-        current_mode = (current_mode < 8) ? current_mode + 1 : 0;
-        fsm_set_mode(current_mode);
-        ui_menu_update();
-    }
-    if (btn.select) {
-        current_submode = ui_pot_get_submode();
-        fsm_set_submode(current_submode);
-        ui_menu_update();
-    }
-    if (btn.select_hold) {
-        ui_menu_settings();
-    }
-}
-
-void ui_menu_settings(void) {
-    ui_lcd_clear();
     ui_lcd_set_line(0, "SETTINGS");
-    ui_lcd_set_line(1, "Speed:");
-    ui_lcd_set_line(2, "Accel:");
+    snprintf(line, sizeof(line), "%cFeed max: %u%%", param_idx == 0 ? '>' : ' ', edit_feed_max);
+    ui_lcd_set_line(1, line);
+    snprintf(line, sizeof(line), "%cBuzzer: %s", param_idx == 1 ? '>' : ' ', edit_buzzer ? "ON" : "OFF");
+    ui_lcd_set_line(2, line);
+    ui_lcd_set_line(3, "HldSel=cancel");
 }
 
-void ui_menu_set_mode(uint8_t mode) {
-    current_mode = mode;
-    ui_menu_update();
+static void menu_open(void) {
+    menu_active = 1;
+    param_idx = 0;
+    edit_feed_max = config_get_feed_max();
+    edit_buzzer = config_get_buzzer_on();
+    DBG_INFO("UI", "MENU", "open");
 }
 
-void ui_menu_set_submode(uint8_t submode) {
-    current_submode = submode;
-    ui_menu_update();
+static void menu_save_exit(void) {
+    config_set_feed_max(edit_feed_max);
+    config_set_buzzer_on(edit_buzzer);
+    config_save();
+    menu_active = 0;
+    ui_buzzer_beep();
+    DBG_INFO_VAL("UI", "MENU", "feed", edit_feed_max);
+}
+
+static void menu_cancel_exit(void) {
+    menu_active = 0;
+    DBG_INFO("UI", "MENU", "cancel");
+}
+
+static void menu_adjust(int8_t dir) {
+    if (param_idx == 0) {
+        if (dir > 0 && edit_feed_max < 100) edit_feed_max += 5;
+        if (dir < 0 && edit_feed_max > 10) edit_feed_max -= 5;
+    } else if (dir != 0) {
+        edit_buzzer = (dir > 0) ? 1 : 0;
+    }
+}
+
+void ui_menu_poll(void) {
+    ButtonState_t st = ui_buttons_get_state();
+    ButtonClicks_t cl = ui_buttons_get_clicks();
+
+    if (!menu_active) {
+        if (st.select_hold) {
+            if (!open_hold_latched) {
+                open_hold_latched = 1;
+                menu_open();
+            }
+        } else {
+            open_hold_latched = 0;
+        }
+        return;
+    }
+
+    if (st.select_hold) {
+        if (!cancel_hold_latched) {
+            cancel_hold_latched = 1;
+            menu_cancel_exit();
+        }
+        return;
+    }
+    cancel_hold_latched = 0;
+
+    if (cl.select) {
+        menu_save_exit();
+        return;
+    }
+    if (cl.left && param_idx > 0) param_idx--;
+    if (cl.right && param_idx < 1) param_idx++;
+    if (cl.up) menu_adjust(1);
+    if (cl.down) menu_adjust(-1);
 }

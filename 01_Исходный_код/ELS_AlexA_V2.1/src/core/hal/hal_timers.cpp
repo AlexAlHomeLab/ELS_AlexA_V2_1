@@ -19,8 +19,10 @@ void timer1_init(uint16_t period_us) {
 }
 
 ISR(TIMER1_COMPA_vect) {
+    cli();
     stepper_ticks++;
     stepper_generate_steps();
+    sei();
 }
 
 void timer2_init(void) {

@@ -1,5 +1,12 @@
 #include "hal_ports.h"
+#include <Arduino.h>
 #include <avr/io.h>
+
+uint8_t hal_pin_read(uint8_t pin) {
+    uint8_t port = digitalPinToPort(pin);
+    if (port == NOT_A_PIN) return 1;
+    return (*portInputRegister(port) & digitalPinToBitMask(pin)) ? 1 : 0;
+}
 
 void port_set(uint8_t port, uint8_t pin) {
     switch (port) {

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define FIRMWARE_NAME "ELS AlexA V2.1"
-#define FIRMWARE_STAGE "Stage 1"
+#define FIRMWARE_STAGE "Stage 2"
 
 #define PLATFORM_ARDUINO_MEGA 1
 #define CPU_FREQ 16000000UL
@@ -34,6 +34,11 @@
 #endif
 
 #define BTN_DEBOUNCE_MS 50
+
+#define STEP_ISR_PERIOD_US 33
+#define STEP_ISR_FREQ_HZ (1000000UL / STEP_ISR_PERIOD_US)
+#define JOG_SPEED_MIN_SPS 100UL
+#define JOG_SPEED_MAX_SPS 5000UL
 
 #include "config_defs.h"
 

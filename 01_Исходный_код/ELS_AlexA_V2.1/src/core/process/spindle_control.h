@@ -21,6 +21,8 @@ void spindle_start(void);
 void spindle_stop(void);
 uint32_t spindle_get_rpm(void);
 uint32_t spindle_get_frequency(void);
+void spindle_encoder_isr_tick(void);
+void spindle_encoder_isr_step(void);
 void spindle_encoder_handler(void);
 void spindle_encoder_process(uint8_t a, uint8_t b);
 

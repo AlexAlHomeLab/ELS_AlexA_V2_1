@@ -1,6 +1,7 @@
 #include "../../config/config.h"
 #include "debug_serial.h"
 
+#include "../../config/config_defs.h"
 #include <Arduino.h>
 
 static uint8_t serial_enabled = 1;
@@ -65,6 +66,21 @@ void debug_log_event_val(uint8_t level, const char *module, const char *componen
     Serial.print(component);
     Serial.print("] ");
     Serial.print(msg);
+    Serial.print(' ');
     Serial.println(val);
+#endif
+}
+
+void debug_log_jog(int32_t steps, uint8_t axis, int32_t coord_steps) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    int32_t st = (steps < 0) ? -steps : steps;
+    Serial.print("[INFO] [MOT] [JOG] ");
+    Serial.print(axis == AXIS_X ? 'X' : 'Z');
+    Serial.print("stp ");
+    Serial.print(st);
+    Serial.print(' ');
+    Serial.print(axis == AXIS_X ? 'X' : 'Z');
+    Serial.println(coord_steps);
 #endif
 }

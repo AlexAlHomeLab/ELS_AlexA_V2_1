@@ -16,10 +16,12 @@ void debug_serial_enable(uint8_t enable);
 
 void debug_log_event(uint8_t level, const char *module, const char *component, const char *msg);
 void debug_log_event_val(uint8_t level, const char *module, const char *component, const char *msg, uint32_t val);
+void debug_log_jog(int32_t steps, uint8_t axis, int32_t coord_steps);
 
 #if DEBUG_ENABLED
 #define DBG_INFO(mod, comp, msg) debug_log_event(DEBUG_LEVEL_INFO, mod, comp, msg)
 #define DBG_INFO_VAL(mod, comp, msg, v) debug_log_event_val(DEBUG_LEVEL_INFO, mod, comp, msg, v)
+#define DBG_JOG(steps, axis, coord) debug_log_jog(steps, axis, coord)
 #else
 #define DBG_INFO(mod, comp, msg) ((void)0)
 #define DBG_INFO_VAL(mod, comp, msg, v) ((void)0)

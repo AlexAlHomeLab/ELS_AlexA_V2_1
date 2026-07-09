@@ -29,6 +29,7 @@ uint16_t microsteps;
 
 /* --- Основные функции --- */
 void dds_init(void);
+uint32_t dds_calc_increment(uint32_t steps_per_sec);
 void dds_set_speed(uint8_t axis, uint32_t steps_per_sec);
 void dds_set_direction(uint8_t axis, uint8_t dir);
 void dds_enable(uint8_t axis, uint8_t enable);
@@ -36,9 +37,12 @@ void stepper_generate_steps(void);
 int32_t dds_get_position(uint8_t axis);
 void dds_set_position(uint8_t axis, int32_t pos);
 void dds_set_target(uint8_t axis, int32_t target);
-
+int32_t dds_get_target(uint8_t axis);
+uint8_t dds_at_target(uint8_t axis);
+void dds_reset_accumulator(void);
 
 #ifdef __cplusplus
 }
 #endif
+
 #endif

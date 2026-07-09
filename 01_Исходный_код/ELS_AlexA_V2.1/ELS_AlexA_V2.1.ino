@@ -1,16 +1,24 @@
 /*
- * ELS AlexA V2.1 — этап 1 (шаги 1–9)
+ * ELS AlexA V2.1 — этап 2.1: MPG jog + DDS
  * Arduino Mega 2560, пины из wokwi diagram.json
  */
 
 #include "src/config/config.h"
+#include "src/config/config_storage.h"
 #include "src/core/debug/debug_serial.h"
 #include "src/core/hal/hal_init.h"
+#include "src/core/hal/hal_interrupts.h"
+#include "src/core/hal/hal_timers.h"
 #include "src/core/motion/limits.h"
+#include "src/core/motion/motion_control.h"
+#include "src/core/motion/motion_jog.h"
+#include "src/core/motion/stepper_gen.h"
+#include "src/core/process/estop_control.h"
 #include "src/core/process/spindle_control.h"
 #include "src/core/ui/ui_buttons.h"
 #include "src/core/ui/ui_encoder.h"
 #include "src/core/ui/ui_lcd.h"
+#include "src/core/ui/ui_menu.h"
 #include "src/core/ui/ui_pot.h"
 #include "src/core/ui/ui_switches.h"
 
@@ -26,25 +34,39 @@ static const char *submode_name(uint8_t sub) {
     return "Man";
 }
 
-static void update_lcd(void) {
-    SwitchState_t sw = ui_switches_get_state();
+static int32_t lcd_axis_coord(uint8_t axis) {
+    return motion_jog_get_pos(axis);
+}
 
-    snprintf(lcd_line, sizeof(lcd_line), "M:%u %s",
-             sw.mode, submode_name(sw.submode));
+static void update_main_lcd(void) {
+    SwitchState_t sw = ui_switches_get_state();
+    uint8_t feed_pct = ui_pot_get_percent();
+    uint8_t feed_max = config_get_feed_max();
+    uint8_t feed_show = (uint8_t)((feed_pct * feed_max) / 100U);
+
+    snprintf(lcd_line, sizeof(lcd_line), "M:%u %s Mx:%u",
+             sw.mode, submode_name(sw.submode), config_get_feed_max());
     ui_lcd_set_line(1, lcd_line);
 
     char axis = (sw.mpg_axis == AXIS_X) ? 'X' : 'Z';
     snprintf(lcd_line, sizeof(lcd_line), "MPG %c %+ld F:%u%%",
-             axis, (long)ui_encoder_get_mpg_pos(), ui_pot_get_percent());
+             axis, (long)motion_jog_get_hand(sw.mpg_axis), feed_show);
     ui_lcd_set_line(2, lcd_line);
 
-    snprintf(lcd_line, sizeof(lcd_line), "L%c F%c R%c Re%c RPM:%lu",
-             limits_ui_led_on(0) ? '*' : ' ',
-             limits_ui_led_on(1) ? '*' : ' ',
-             limits_ui_led_on(2) ? '*' : ' ',
-             limits_ui_led_on(3) ? '*' : ' ',
+    snprintf(lcd_line, sizeof(lcd_line), "X:%+ld Z:%+ld RPM:%lu",
+             (long)lcd_axis_coord(AXIS_X),
+             (long)lcd_axis_coord(AXIS_Z),
              (unsigned long)spindle_get_rpm());
     ui_lcd_set_line(3, lcd_line);
+}
+
+static void update_lcd(void) {
+    ui_lcd_set_line(0, FIRMWARE_NAME);
+    if (ui_menu_is_active()) {
+        ui_menu_lcd();
+    } else {
+        update_main_lcd();
+    }
 }
 
 void setup() {
@@ -54,26 +76,35 @@ void setup() {
     debug_serial_println("");
     debug_serial_println(FIRMWARE_NAME " " FIRMWARE_STAGE " Starting...");
 
+    config_load();
+    motion_init();
+    motion_jog_init();
+    timer1_init(STEP_ISR_PERIOD_US);
+
     ui_lcd_init();
     ui_switches_init();
     ui_buttons_init();
     limits_ui_init();
     ui_pot_init();
     ui_encoder_init();
+    ui_menu_init();
     spindle_init();
+    encoder_interrupts_init();
 
-    ui_lcd_set_line(0, FIRMWARE_NAME);
-    ui_lcd_set_line(1, FIRMWARE_STAGE " Ready");
     update_lcd();
     ui_lcd_update();
 
-    DBG_INFO("SYS", "INIT", "Stage 1 ready");
+    DBG_INFO("SYS", "INIT", "Stage 2 jog ready");
 }
 
 void loop() {
+    estop_check();
     ui_buttons_poll();
     ui_switches_poll();
     ui_encoder_poll();
+    motion_jog_joy_poll();
+    motion_jog_poll();
+    ui_menu_poll();
     spindle_poll();
 
     if (millis() - last_pot_ms >= POT_READ_MS) {

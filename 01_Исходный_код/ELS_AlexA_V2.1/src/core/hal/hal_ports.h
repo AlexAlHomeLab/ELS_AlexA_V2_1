@@ -40,6 +40,7 @@ void port_set(uint8_t port, uint8_t pin);
 void port_clear(uint8_t port, uint8_t pin);
 uint8_t port_read(uint8_t port, uint8_t pin);
 void port_toggle(uint8_t port, uint8_t pin);
+uint8_t hal_pin_read(uint8_t pin);
 
 /* --- Макросы для максимальной скорости --- */
 

@@ -21,6 +21,12 @@ void motion_move_rel(float dx, float dz, float speed) {
 
 void motion_stop(void) {
     planner_stop_all();
+    dds_set_target(AXIS_X, dds_get_position(AXIS_X));
+    dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
+    dds_enable(AXIS_X, 0);
+    dds_enable(AXIS_Z, 0);
+    dds_set_speed(AXIS_X, 0);
+    dds_set_speed(AXIS_Z, 0);
 }
 
 uint8_t motion_is_moving(void) {
