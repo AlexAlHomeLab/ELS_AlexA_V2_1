@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Arduino: Compile Mega (Wokwi)",
+      "type": "shell",
+      "command": "${env:LOCALAPPDATA}/Programs/Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe",
+      "args": [
+        "compile",
+        "--fqbn",
+        "arduino:avr:mega:cpu=atmega2560",
+        "--output-dir",
+        "${workspaceFolder}/01_Исходный_код/ELS_AlexA_V2.1/build",
+        "--libraries",
+        "${workspaceFolder}/01_Исходный_код/ELS_AlexA_V2.1/libraries",
+        "--libraries",
+        "${env:LOCALAPPDATA}/Arduino15/libraries",
+        "--libraries",
+        "${env:USERPROFILE}/Documents/Arduino/libraries",
+        "${workspaceFolder}/01_Исходный_код/ELS_AlexA_V2.1"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": false
+      },
+      "problemMatcher": "$gcc"
+    }
+  ]
+}

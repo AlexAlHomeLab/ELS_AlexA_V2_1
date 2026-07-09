@@ -1,0 +1,8 @@
+#ifndef MODE_THREAD_CFG_H
+#define MODE_THREAD_CFG_H
+
+#define THREAD_RAPID_DIST 5.0f
+#define THREAD_BRAKE_DIST 2.0f
+#define THREAD_MAX_FREQ 30000
+
+#endif

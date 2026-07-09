@@ -1,0 +1,85 @@
+# Coding Standards для ELS AlexA V2.1
+
+
+
+
+- Все строковые константы хранить в PROGMEM
+- Использовать макросы F() для вывода в Serial
+- Избегать динамического выделения памяти (new/malloc)
+- Буферы фиксированного размера с проверкой границ
+
+
+Защита разделяемых данных через ATOMIC_BLOCK
+ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+// Критический код
+}
+
+
+- Проверка всех указателей на NULL
+- Проверка граничных условий во всех циклах
+- Использование assert() для критических параметров
+- Early Exit: проверка условий в начале функции
+
+
+typedef enum {
+STATE_IDLE,
+STATE_RUNNING,
+STATE_STOPPED,
+STATE_ERROR
+} MachineState_t;
+
+switch(currentState) {
+case STATE_IDLE:  // обработка
+case STATE_RUNNING:  // обработка
+case STATE_STOPPED:  // обработка
+case STATE_ERROR:  // обработка
+}
+
+
+
+if (pos > limit_
+handle_error(ERR_LIMIT_
+return false; \
+}
+
+
+typedef union {
+uint8_t raw;
+struct {
+uint8_t enable : 1;
+uint8_t direction : 1;
+uint8_t step : 1;
+uint8_t reserved : 5;
+};
+} MotorControl_t;
+
+
+/**
+* @brief Краткое описание функции
+* @param param1 Описание параметра
+* @return Описание возвращаемого значения
+*/
+int function_name(int param1) {
+// комментарий к блоку
+return result;
+}
+
+
+- Переменные: camelCase (motorSpeed)
+- Константы: UPPER_CASE (MAX_SPEED)
+- Типы: PascalCase (MotorController)
+- Функции: snake_case (get_motor_speed)
+- Макросы: UPPER_CASE (CHECK_LIMIT)
+
+
+- goto
+- глобальные переменные (кроме конфигов)
+- рекурсия
+- динамическая память
+- длинные функции (>100 строк)
+
+
+- Один .h и один .c на модуль
+- Все публичные функции в .h
+- Статические функции внутри .c
+- Чёткое разделение на слои (HAL, Motion, UI, FSM)

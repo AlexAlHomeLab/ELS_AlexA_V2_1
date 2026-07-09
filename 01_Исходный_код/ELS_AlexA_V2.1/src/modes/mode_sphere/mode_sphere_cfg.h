@@ -1,0 +1,8 @@
+#ifndef MODE_SPHERE_CFG_H
+#define MODE_SPHERE_CFG_H
+
+#define SPHERE_SEGMENTS 36
+#define SPHERE_MIN_RADIUS 1.0f
+#define SPHERE_MAX_RADIUS 100.0f
+
+#endif

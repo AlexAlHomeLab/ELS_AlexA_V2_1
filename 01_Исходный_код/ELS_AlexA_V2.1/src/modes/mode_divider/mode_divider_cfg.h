@@ -1,0 +1,8 @@
+#ifndef MODE_DIVIDER_CFG_H
+#define MODE_DIVIDER_CFG_H
+
+#define DIVIDER_MIN_PARTS 2
+#define DIVIDER_MAX_PARTS 360
+#define DIVIDER_DEFAULT_PARTS 36
+
+#endif

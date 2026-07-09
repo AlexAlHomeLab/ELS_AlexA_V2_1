@@ -1,0 +1,9 @@
+#ifndef MODE_ASYNC_CFG_H
+#define MODE_ASYNC_CFG_H
+
+#define ASYNC_MIN_FEED 0.1f
+#define ASYNC_MAX_FEED 1000.0f
+#define ASYNC_DEFAULT_DEPTH 0.5f
+#define ASYNC_DEFAULT_PASSES 3
+
+#endif
