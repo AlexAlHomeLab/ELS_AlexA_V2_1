@@ -1,5 +1,6 @@
 #include "ui_switches.h"
 #include "ui_io.h"
+#include "../motion/motion_jog.h"
 #include "../debug/debug_serial.h"
 #include "../hal/hal_pins.h"
 #include "../../config/config_defs.h"
@@ -170,6 +171,7 @@ void ui_switches_poll(void) {
     sw_state.mpg_scale = read_mpg_scale();
 
     if (sw_state.mpg_axis != last_mpg_axis) {
+        motion_jog_on_axis_select(sw_state.mpg_axis);
         DBG_INFO_VAL("UI", "AXIS", (sw_state.mpg_axis == AXIS_X) ? "X" : "Z",
                      HAND_AXIS_PORT_RD());
         last_mpg_axis = sw_state.mpg_axis;

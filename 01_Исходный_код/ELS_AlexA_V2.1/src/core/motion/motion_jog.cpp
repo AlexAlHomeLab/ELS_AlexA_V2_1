@@ -19,10 +19,13 @@
 #define JOY_LOOKAHEAD 8           /* множитель chunk при джоге */
 #define MPG_MAX_TICKS 24          /* макс. тиков РГИ за один poll */
 #define MPG_LOOKAHEAD 4           /* runway шагов вперёд для cruise */
+#define MPG_MAX_RUNWAY_STEPS 512  /* верхняя граница runway */
+#define MPG_MAX_CMD_AHEAD 4096    /* макс. опережение cmd над position, шаги */
 #define MPG_IDLE_STOP_MS 80UL     /* пауза после тика → дотягивание до cmd */
 #define MPG_BATCH_MS 8UL          /* ожидание всех detent перед первым exec */
 #define MPG_IDLE_DECEL_MS 250UL   /* сброс mpg_active после простоя */
 #define MPG_REV_IGNORE_TICKS 3    /* игнор тиков при смене направления РГИ */
+#define MPG_AXIS_ARM_LOOPS 2U     /* пропуск poll после смены оси РГИ */
 
 static int32_t hand_pos[2];       /* накопленное смещение РГИ, шаги */
 static uint8_t joy_z_on;          /* джойстик Z активен */
@@ -42,6 +45,9 @@ static uint8_t mpg_axis_last;     /* последняя ось селектор�
 static uint8_t mpg_rev_cnt;       /* счётчик тиков реверса */
 static int8_t mpg_dir_lock;       /* заблокированное направление (+1/-1) */
 static unsigned long mpg_batch_ms;
+static uint8_t mpg_axis_arm;      /* >0 — пропуск poll после смены оси */
+static SwitchState_t mpg_sw;
+static ButtonState_t mpg_btn;
 
 static void go_limit_stop(void) {  /* отмена go_lim */
     if (!go_lim_active) return;
@@ -130,9 +136,6 @@ static void mpg_apply_tick(uint8_t axis, int32_t steps, uint8_t rapid, uint8_t *
         *lim_hit = 1U;
     }
     hand_pos[axis] += mpg_cmd[axis] - prev;
-    if (mpg_cmd[axis] != prev) {
-        DBG_MPG_PULSE(axis, mpg_cmd[axis]);
-    }
 }
 
 static void mpg_sync_cmd(void) {  /* mpg_cmd = текущая позиция DDS */
@@ -143,11 +146,22 @@ static void mpg_sync_cmd(void) {  /* mpg_cmd = текущая позиция DDS
 static int32_t mpg_runway(uint8_t axis, int8_t sign, uint8_t mpg_scale, uint8_t rapid) {
     /* запас шагов вперёд для jog cruise */
     int32_t step;
+    int32_t rw;
 
     if (sign == 0) return 0;
     step = jog_steps_from_delta(axis, sign, mpg_scale, rapid);
     if (step < 0) step = -step;
-    return step * (int32_t)MPG_LOOKAHEAD;
+    rw = step * (int32_t)MPG_LOOKAHEAD;
+    if (rw > MPG_MAX_RUNWAY_STEPS) rw = MPG_MAX_RUNWAY_STEPS;
+    return rw;
+}
+
+static int32_t mpg_clamp_cmd_ahead(int32_t pos, int32_t cmd_tgt) {
+    int32_t d = cmd_tgt - pos;
+
+    if (d > MPG_MAX_CMD_AHEAD) return pos + MPG_MAX_CMD_AHEAD;
+    if (d < -MPG_MAX_CMD_AHEAD) return pos - MPG_MAX_CMD_AHEAD;
+    return cmd_tgt;
 }
 
 static int8_t mpg_motion_sign(uint8_t axis) {  /* знак ошибки mpg_cmd − position */
@@ -166,14 +180,33 @@ static int8_t mpg_motion_sign(uint8_t axis) {  /* знак ошибки mpg_cmd 
     return 0;
 }
 
-static void mpg_motion_abort(uint8_t axis) {  /* стоп при реверсе РГИ на ходу */
-    dds_motion_stop();
-    planner_jog_stop();
-    mpg_cmd[axis] = dds_get_position(axis);
+static void mpg_session_halt(void) {  /* полный стоп MPG/jog + sync cmd */
+    planner_jog_halt();
     mpg_active = 0;
     mpg_dir_lock = 0;
     mpg_rev_cnt = 0;
     mpg_batch_ms = 0;
+    mpg_sync_cmd();
+}
+
+static void mpg_motion_abort(uint8_t axis) {  /* стоп при реверсе РГИ на ходу */
+    (void)axis;
+    mpg_session_halt();
+}
+
+void motion_jog_on_axis_select(uint8_t new_axis) {
+    if (new_axis > AXIS_Z) return;
+    if (new_axis == mpg_axis_last) return;
+    if (planner_startup_busy()) {
+        mpg_axis_last = new_axis;
+        ui_encoder_discard_mpg_delta();
+        mpg_axis_arm = MPG_AXIS_ARM_LOOPS;
+        return;
+    }
+    mpg_session_halt();
+    ui_encoder_discard_mpg_delta();
+    mpg_axis_last = new_axis;
+    mpg_axis_arm = MPG_AXIS_ARM_LOOPS;
 }
 
 static void mpg_sync_overshoot(uint8_t axis) {  /* cmd не отстаёт от position при lock */
@@ -219,6 +252,7 @@ static void mpg_planner_commit(uint8_t axis, const SwitchState_t *sw, const Butt
     } else if (mpg_dir_lock < 0 && cmd_tgt > pos) {
         cmd_tgt = pos;
     }
+    cmd_tgt = mpg_clamp_cmd_ahead(pos, cmd_tgt);
 
     if (axis == AXIS_X) {
         tx = jog_clamp_target(AXIS_X, cmd_tgt, btn->joy_rapid);
@@ -243,8 +277,10 @@ static void mpg_planner_commit(uint8_t axis, const SwitchState_t *sw, const Butt
         }
     }
 
-    planner_exec_jog(tx, tz, jog_speed_mm_min(axis, btn->joy_rapid), "MPG", 1, lim_hit, 0U, 0L);
-    mpg_active = 1;
+    if (planner_exec_jog(tx, tz, jog_speed_mm_min(axis, btn->joy_rapid), "MPG", 1, lim_hit, 0U, 0L)) {
+        mpg_active = 1;
+        DBG_MPG_PULSE(axis, mpg_cmd[axis]);
+    }
 }
 
 void motion_jog_init(void) {
@@ -263,6 +299,7 @@ void motion_jog_init(void) {
     mpg_rev_cnt = 0;
     mpg_dir_lock = 0;
     mpg_batch_ms = 0;
+    mpg_axis_arm = 0;
     mpg_sync_cmd();
     motion_zero_all();
 }
@@ -480,14 +517,14 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
 }
 
 void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop */
-    SwitchState_t sw;
-    ButtonState_t btn;
     uint8_t axis;
     int32_t steps;
     uint8_t any_tick = 0U;
     int32_t tx;
     int32_t tz;
     uint8_t lim_hit = 0U;
+    SwitchState_t *sw = &mpg_sw;
+    ButtonState_t *btn = &mpg_btn;
 
     if (estop_is_triggered()) {
         mpg_active = 0;
@@ -512,14 +549,29 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
         dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
         backlash_sync_axis(AXIS_X, BACKLASH_REF_DIR_X);
         backlash_sync_axis(AXIS_Z, BACKLASH_REF_DIR_Z);
+        {
+            SwitchState_t sw0 = ui_switches_get_state();
+            mpg_axis_last = sw0.mpg_axis;
+        }
+    }
+
+    {
+        SwitchState_t sw0 = ui_switches_get_state();
+        motion_jog_on_axis_select(sw0.mpg_axis);
+    }
+
+    if (mpg_axis_arm > 0U) {
+        ui_encoder_discard_mpg_delta();
+        mpg_axis_arm--;
+        return;
     }
 
     if (ui_encoder_peek_mpg_delta() == 0) {
         if (mpg_batch_ms != 0UL && (millis() - mpg_batch_ms) >= MPG_BATCH_MS) {
-            sw = ui_switches_get_state();
-            btn = ui_buttons_get_state();
+            *sw = ui_switches_get_state();
+            *btn = ui_buttons_get_state();
             mpg_batch_ms = 0UL;
-            mpg_planner_commit(mpg_axis_last, &sw, &btn, 0U);
+            mpg_planner_commit(mpg_axis_last, sw, btn, 0U);
             mpg_last_ms = millis();
             return;
         }
@@ -558,6 +610,9 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
                                      lim_hit, 0U, 0L);
                 } else {
                     if (millis() - mpg_last_ms >= MPG_IDLE_DECEL_MS) {
+                        if (dds_motion_jog_cruise_active()) {
+                            planner_jog_stop();
+                        }
                         mpg_active = 0;
                         mpg_rev_cnt = 0;
                         mpg_dir_lock = 0;
@@ -569,15 +624,9 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
         return;
     }
 
-    sw = ui_switches_get_state();
-    btn = ui_buttons_get_state();
-    axis = sw.mpg_axis;
-    if (axis != mpg_axis_last) {
-        mpg_dir_lock = 0;
-        mpg_rev_cnt = 0;
-        mpg_batch_ms = 0;
-    }
-    mpg_axis_last = axis;
+    *sw = ui_switches_get_state();
+    *btn = ui_buttons_get_state();
+    axis = sw->mpg_axis;
 
     if ((axis == AXIS_Z && joy_z_on) || (axis == AXIS_X && joy_x_on)) {
         DBG_VERBOSE("JOG", "MPG", "blk joy");
@@ -618,17 +667,17 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
                 lock_sign = tick_sign;
                 mpg_dir_lock = tick_sign;
                 mpg_rev_cnt = 0;
-                steps = jog_steps_from_delta(axis, tick_sign, sw.mpg_scale, btn.joy_rapid);
-                mpg_apply_tick(axis, steps, btn.joy_rapid, &lim_hit);
+                steps = jog_steps_from_delta(axis, tick_sign, sw->mpg_scale, btn->joy_rapid);
+                mpg_apply_tick(axis, steps, btn->joy_rapid, &lim_hit);
                 if (steps != 0) any_tick = 1U;
                 continue;
             } else {
                 mpg_rev_cnt = 0;
             }
 
-            steps = jog_steps_from_delta(axis, tick_sign, sw.mpg_scale, btn.joy_rapid);
+            steps = jog_steps_from_delta(axis, tick_sign, sw->mpg_scale, btn->joy_rapid);
             (void)ui_encoder_consume_mpg_tick();
-            mpg_apply_tick(axis, steps, btn.joy_rapid, &lim_hit);
+            mpg_apply_tick(axis, steps, btn->joy_rapid, &lim_hit);
             if (steps != 0) any_tick = 1U;
         }
     }
@@ -647,5 +696,5 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
     }
     mpg_batch_ms = 0UL;
 
-    mpg_planner_commit(axis, &sw, &btn, lim_hit);
+    mpg_planner_commit(axis, sw, btn, lim_hit);
 }

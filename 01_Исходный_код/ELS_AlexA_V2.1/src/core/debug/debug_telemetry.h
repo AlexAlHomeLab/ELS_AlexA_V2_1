@@ -6,6 +6,7 @@
 
 
 
+#include "../../config/config.h"
 #include "../../els_types.h"
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,7 @@ void debug_telemetry_clear(void);
 
 /* --- Макросы для удобства --- */
 
+#if DEBUG_ENABLED
 #define DEBUG_LOG(module, component, msg, val) \
     debug_telemetry_log(DEBUG_LEVEL_INFO, module, component, msg, val)
 
@@ -45,6 +47,11 @@ void debug_telemetry_clear(void);
 
 #define DEBUG_ERROR(module, component, msg, val) \
     debug_telemetry_log(DEBUG_LEVEL_ERROR, module, component, msg, val)
+#else
+#define DEBUG_LOG(module, component, msg, val) ((void)0)
+#define DEBUG_WARN(module, component, msg, val) ((void)0)
+#define DEBUG_ERROR(module, component, msg, val) ((void)0)
+#endif
 
 
 #ifdef __cplusplus

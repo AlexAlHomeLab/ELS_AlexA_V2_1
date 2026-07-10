@@ -17,24 +17,34 @@ static const char *level_tag(uint8_t level) {
 
 void debug_serial_init(uint32_t baud) {
     Serial.begin(baud);
+#if DEBUG_ENABLED
     serial_enabled = 1;
+#else
+    serial_enabled = 0;
+#endif
 }
 
 void debug_serial_print(const char *msg) {
+#if DEBUG_ENABLED
     if (!serial_enabled) return;
     Serial.print(msg);
+#endif
 }
 
 void debug_serial_println(const char *msg) {
+#if DEBUG_ENABLED
     if (!serial_enabled) return;
     Serial.println(msg);
+#endif
 }
 
 void debug_serial_print_val(const char *label, uint32_t val) {
+#if DEBUG_ENABLED
     if (!serial_enabled) return;
     Serial.print(label);
     Serial.print(": ");
     Serial.println(val);
+#endif
 }
 
 void debug_serial_enable(uint8_t enable) {

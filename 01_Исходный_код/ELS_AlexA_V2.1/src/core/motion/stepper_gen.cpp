@@ -32,6 +32,22 @@ typedef struct {
 
 static MotionProfile_t motion_prof;
 
+/* scratch для dds_motion_start — экономия ~40 байт стека (SRAM ~50%) */
+static struct {
+    int32_t cx;
+    int32_t cz;
+    int32_t tx;
+    int32_t tz;
+    uint32_t ux;
+    uint32_t uz;
+    uint32_t um;
+    uint8_t master;
+    uint32_t nominal;
+    uint32_t entry;
+    uint32_t exit_r;
+    uint32_t accel;
+} dds_start;
+
 /* Кольцевая очередь отладочного лога (ISR → main) */
 #define MOTION_LOG_QSIZE 6U
 #define MOTION_LOG_CRUISE 1U   /* вход в крейсер */
@@ -475,6 +491,21 @@ void stepper_generate_steps(void) {  /* ISR: шаг X, шаг Z, заверше�
     dds_axis_step(AXIS_X, &axis_x, step_x_on, step_x_off, dir_x_set);
     dds_axis_step(AXIS_Z, &axis_z, step_z_on, step_z_off, dir_z_set);
 
+    if (motion_prof.active && motion_prof.jog_cruise) {
+        if (axis_x.position == axis_x.target_position &&
+            axis_z.position == axis_z.target_position &&
+            backlash_pending(AXIS_X) <= 0 &&
+            backlash_pending(AXIS_Z) <= 0) {
+            motion_prof.active = 0U;
+            motion_prof.jog_cruise = 0U;
+            axis_x.enabled = 0U;
+            axis_z.enabled = 0U;
+            axis_x.step_increment = 0U;
+            axis_z.step_increment = 0U;
+            return;
+        }
+    }
+
     if (motion_prof.active && motion_profile_done()) {
         motion_prof.active = 0U;
         axis_x.enabled = 0U;
@@ -483,22 +514,67 @@ void stepper_generate_steps(void) {  /* ISR: шаг X, шаг Z, заверше�
 }
 
 int32_t dds_get_position(uint8_t axis) {
-    return (axis == AXIS_X) ? axis_x.position : axis_z.position;
+    AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
+    if (!(SREG & (uint8_t)(1U << 7))) {
+        return a->position;
+    }
+    {
+        uint8_t sreg = SREG;
+        int32_t v;
+
+        cli();
+        v = a->position;
+        SREG = sreg;
+        return v;
+    }
 }
 
 void dds_set_position(uint8_t axis, int32_t pos) {
     AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
-    a->position = pos;
-    a->target_position = pos;
+    if (!(SREG & (uint8_t)(1U << 7))) {
+        a->position = pos;
+        a->target_position = pos;
+        return;
+    }
+    {
+        uint8_t sreg = SREG;
+
+        cli();
+        a->position = pos;
+        a->target_position = pos;
+        SREG = sreg;
+    }
 }
 
 void dds_set_target(uint8_t axis, int32_t target) {
     AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
-    a->target_position = target;
+    if (!(SREG & (uint8_t)(1U << 7))) {
+        a->target_position = target;
+        return;
+    }
+    {
+        uint8_t sreg = SREG;
+
+        cli();
+        a->target_position = target;
+        SREG = sreg;
+    }
 }
 
 int32_t dds_get_target(uint8_t axis) {
-    return (axis == AXIS_X) ? axis_x.target_position : axis_z.target_position;
+    AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
+    if (!(SREG & (uint8_t)(1U << 7))) {
+        return a->target_position;
+    }
+    {
+        uint8_t sreg = SREG;
+        int32_t v;
+
+        cli();
+        v = a->target_position;
+        SREG = sreg;
+        return v;
+    }
 }
 
 uint8_t dds_at_target(uint8_t axis) {
@@ -518,20 +594,17 @@ void dds_reset_accumulator(void) {
 }
 
 void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / сегмент */
+    uint8_t sreg;
+
     if (!cmd) return;
 
-    int32_t cx = dds_get_position(AXIS_X);
-    int32_t cz = dds_get_position(AXIS_Z);
-    int32_t tx = cmd->target_x;
-    int32_t tz = cmd->target_z;
-    uint32_t ux;
-    uint32_t uz;
-    uint32_t um;
-    uint8_t master;
-    uint32_t nominal;
-    uint32_t entry;
-    uint32_t exit_r;
-    uint32_t accel;
+    sreg = SREG;
+    cli();
+
+    dds_start.cx = axis_x.position;
+    dds_start.cz = axis_z.position;
+    dds_start.tx = cmd->target_x;
+    dds_start.tz = cmd->target_z;
 
     motion_prof.active = 0U;
     motion_prof.flags = cmd->flags;
@@ -544,7 +617,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
         uint8_t ref = (ax == AXIS_X) ? BACKLASH_REF_DIR_X : BACKLASH_REF_DIR_Z;
         int32_t steps = cmd->bl_steps;
 
-        if (steps <= 0) return;
+        if (steps <= 0) goto dds_motion_start_exit;
 
         backlash_queue_takeup(ax, ref, steps);
         dds_set_direction(ax, ref);
@@ -552,82 +625,84 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
         dds_enable(ax, 1U);
         if (ax == AXIS_X) {
             motion_prof.axis_steps[AXIS_X] = (uint32_t)steps;
-            master = AXIS_X;
+            dds_start.master = AXIS_X;
         } else {
             motion_prof.axis_steps[AXIS_Z] = (uint32_t)steps;
-            master = AXIS_Z;
+            dds_start.master = AXIS_Z;
         }
-        um = (uint32_t)steps;
+        dds_start.um = (uint32_t)steps;
 
         {
-            float cap = (float)config_get_max_speed_mm_min(master);
+            float cap = (float)config_get_max_speed_mm_min(dds_start.master);
             float spd = cmd->nominal_mm_min;
             if (spd > cap) spd = cap;
-            nominal = mm_min_to_sps(master, spd);
-            entry = mm_min_to_sps(master, cmd->entry_mm_min);
-            exit_r = mm_min_to_sps(master, cmd->exit_mm_min);
+            dds_start.nominal = mm_min_to_sps(dds_start.master, spd);
+            dds_start.entry = mm_min_to_sps(dds_start.master, cmd->entry_mm_min);
+            dds_start.exit_r = mm_min_to_sps(dds_start.master, cmd->exit_mm_min);
         }
-        accel = axis_accel_steps_s2(master);
+        dds_start.accel = axis_accel_steps_s2(dds_start.master);
 
-        motion_prof.master_axis = master;
+        motion_prof.master_axis = dds_start.master;
         motion_prof.active = 1U;
-        motion_prep_profile(um, nominal, entry, exit_r, accel);
-        return;
+        motion_prep_profile(dds_start.um, dds_start.nominal, dds_start.entry, dds_start.exit_r,
+                            dds_start.accel);
+        goto dds_motion_start_exit;
     }
 
     {
-        int32_t dx = tx - cx;
-        int32_t dz = tz - cz;
-        ux = (uint32_t)((dx < 0) ? -dx : dx);
-        uz = (uint32_t)((dz < 0) ? -dz : dz);
-        um = ux > uz ? ux : uz;
+        int32_t dx = dds_start.tx - dds_start.cx;
+        int32_t dz = dds_start.tz - dds_start.cz;
+        dds_start.ux = (uint32_t)((dx < 0) ? -dx : dx);
+        dds_start.uz = (uint32_t)((dz < 0) ? -dz : dz);
+        dds_start.um = dds_start.ux > dds_start.uz ? dds_start.ux : dds_start.uz;
 
-        if (um == 0U) return;
+        if (dds_start.um == 0U) goto dds_motion_start_exit;
 
         if (cmd->flags & MOTION_FLAG_JOG_CRUISE) {
             uint32_t entry_sps;
             uint32_t accel_dist;
 
             motion_update_dirs(dx, dz);
-            dds_set_target(AXIS_X, tx);
-            dds_set_target(AXIS_Z, tz);
-            if (ux > 0U) dds_enable(AXIS_X, 1U);
-            if (uz > 0U) dds_enable(AXIS_Z, 1U);
+            axis_x.target_position = dds_start.tx;
+            axis_z.target_position = dds_start.tz;
+            if (dds_start.ux > 0U) dds_enable(AXIS_X, 1U);
+            if (dds_start.uz > 0U) dds_enable(AXIS_Z, 1U);
 
-            master = (ux >= uz) ? AXIS_X : AXIS_Z;
+            dds_start.master = (dds_start.ux >= dds_start.uz) ? AXIS_X : AXIS_Z;
             {
-                float cap = (float)config_get_max_speed_mm_min(master);
+                float cap = (float)config_get_max_speed_mm_min(dds_start.master);
                 float spd = cmd->nominal_mm_min;
                 if (spd > cap) spd = cap;
-                nominal = mm_min_to_sps(master, spd);
-                entry_sps = mm_min_to_sps(master, cmd->entry_mm_min);
+                dds_start.nominal = mm_min_to_sps(dds_start.master, spd);
+                entry_sps = mm_min_to_sps(dds_start.master, cmd->entry_mm_min);
             }
-            accel = axis_accel_steps_s2(master);
+            if (entry_sps < 1U) entry_sps = 1U;
+            dds_start.accel = axis_accel_steps_s2(dds_start.master);
 
             motion_prof.jog_cruise = 1U;
-            motion_prof.axis_steps[AXIS_X] = ux;
-            motion_prof.axis_steps[AXIS_Z] = uz;
-            motion_prof.master_axis = master;
-            motion_prof.acceleration = accel;
-            motion_prof.nominal_rate = nominal;
+            motion_prof.axis_steps[AXIS_X] = dds_start.ux;
+            motion_prof.axis_steps[AXIS_Z] = dds_start.uz;
+            motion_prof.master_axis = dds_start.master;
+            motion_prof.acceleration = dds_start.accel;
+            motion_prof.nominal_rate = dds_start.nominal;
             motion_prof.initial_rate = entry_sps;
             motion_prof.current_rate = entry_sps;
             motion_prof.final_rate = 1U;
             motion_prof.step_events = 0U;
             motion_prof.step_count = 0xFFFFFFFFU;
             motion_prof.decelerate_after = 0xFFFFFFFEU;
-            accel_dist = accel_distance(nominal, entry_sps, accel);
+            accel_dist = accel_distance(dds_start.nominal, entry_sps, dds_start.accel);
             if (accel_dist < 1U) accel_dist = 1U;
             motion_prof.accelerate_until = accel_dist;
             motion_prof.active = 1U;
             motion_apply_rates();
-            return;
+            goto dds_motion_start_exit;
         }
 
         if (dx != 0) {
             uint8_t nd = (dx > 0) ? 1U : 0U;
             if (axis_x.direction != nd) {
-                mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, tx);
+                mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, dds_start.tx);
             }
             backlash_arm_axis(AXIS_X, nd, 1);
             dds_set_direction(AXIS_X, nd);
@@ -635,43 +710,47 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
         if (dz != 0) {
             uint8_t nd = (dz > 0) ? 1U : 0U;
             if (axis_z.direction != nd) {
-                mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, tz);
+                mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, dds_start.tz);
             }
             backlash_arm_axis(AXIS_Z, nd, 1);
             dds_set_direction(AXIS_Z, nd);
         }
 
-        dds_set_target(AXIS_X, tx);
-        dds_set_target(AXIS_Z, tz);
+        axis_x.target_position = dds_start.tx;
+        axis_z.target_position = dds_start.tz;
 
-        motion_prof.axis_steps[AXIS_X] = ux;
-        motion_prof.axis_steps[AXIS_Z] = uz;
-        master = (ux >= uz) ? AXIS_X : AXIS_Z;
+        motion_prof.axis_steps[AXIS_X] = dds_start.ux;
+        motion_prof.axis_steps[AXIS_Z] = dds_start.uz;
+        dds_start.master = (dds_start.ux >= dds_start.uz) ? AXIS_X : AXIS_Z;
 
         {
-            uint32_t bl_extra = (uint32_t)backlash_pending(master);
+            uint32_t bl_extra = (uint32_t)backlash_pending(dds_start.master);
             if (bl_extra > 0U) {
-                um += bl_extra;
+                dds_start.um += bl_extra;
             }
         }
 
         {
-            float cap = (float)config_get_max_speed_mm_min(master);
+            float cap = (float)config_get_max_speed_mm_min(dds_start.master);
             float spd = cmd->nominal_mm_min;
             if (spd > cap) spd = cap;
-            nominal = mm_min_to_sps(master, spd);
-            entry = mm_min_to_sps(master, cmd->entry_mm_min);
-            exit_r = mm_min_to_sps(master, cmd->exit_mm_min);
+            dds_start.nominal = mm_min_to_sps(dds_start.master, spd);
+            dds_start.entry = mm_min_to_sps(dds_start.master, cmd->entry_mm_min);
+            dds_start.exit_r = mm_min_to_sps(dds_start.master, cmd->exit_mm_min);
         }
-        accel = axis_accel_steps_s2(master);
+        dds_start.accel = axis_accel_steps_s2(dds_start.master);
 
-        if (ux > 0U) dds_enable(AXIS_X, 1U);
-        if (uz > 0U) dds_enable(AXIS_Z, 1U);
+        if (dds_start.ux > 0U) dds_enable(AXIS_X, 1U);
+        if (dds_start.uz > 0U) dds_enable(AXIS_Z, 1U);
 
-        motion_prof.master_axis = master;
+        motion_prof.master_axis = dds_start.master;
         motion_prof.active = 1U;
-        motion_prep_profile(um, nominal, entry, exit_r, accel);
+        motion_prep_profile(dds_start.um, dds_start.nominal, dds_start.entry, dds_start.exit_r,
+                            dds_start.accel);
     }
+
+dds_motion_start_exit:
+    SREG = sreg;
 }
 
 /* Установить DIR и arm люфта при смене знака смещения (jog retarget) */
@@ -718,6 +797,8 @@ static void motion_profile_extend(uint32_t remain_um, uint32_t ux, uint32_t uz) 
 }
 
 uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена цели jog на лету */
+    uint8_t sreg;
+    uint8_t rc = 0U;
     int32_t cx;
     int32_t cz;
     int32_t dx;
@@ -730,6 +811,9 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
     if (!motion_prof.active || !(motion_prof.flags & MOTION_FLAG_JOG)) return 0U;
     if ((cmd->flags & MOTION_FLAG_JOG_CRUISE) && !motion_prof.jog_cruise) return 0U;
 
+    sreg = SREG;
+    cli();
+
     cx = dds_get_position(AXIS_X);
     cz = dds_get_position(AXIS_Z);
     dx = cmd->target_x - cx;
@@ -737,6 +821,13 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
     ux = (uint32_t)((dx < 0) ? -dx : dx);
     uz = (uint32_t)((dz < 0) ? -dz : dz);
     um = ux > uz ? ux : uz;
+
+    if (motion_prof.jog_cruise) {
+        uint8_t new_master = (ux >= uz) ? AXIS_X : AXIS_Z;
+        if (new_master != motion_prof.master_axis) {
+            goto dds_retarget_exit;
+        }
+    }
 
     if (um == 0U) {
         if (motion_prof.jog_cruise) {
@@ -747,7 +838,8 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
             axis_x.step_increment = 0U;
             axis_z.step_increment = 0U;
         }
-        return 1U;
+        rc = 1U;
+        goto dds_retarget_exit;
     }
 
     motion_update_dirs(dx, dz);
@@ -757,18 +849,16 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
         if (ux > 0U) {
             motion_prof.axis_steps[AXIS_X] = ux;
             dds_enable(AXIS_X, 1U);
-        } else if (motion_prof.axis_steps[AXIS_X] > 0U) {
-            dds_enable(AXIS_X, 1U);
         } else {
+            motion_prof.axis_steps[AXIS_X] = 0U;
             axis_x.enabled = 0U;
             axis_x.step_increment = 0U;
         }
         if (uz > 0U) {
             motion_prof.axis_steps[AXIS_Z] = uz;
             dds_enable(AXIS_Z, 1U);
-        } else if (motion_prof.axis_steps[AXIS_Z] > 0U) {
-            dds_enable(AXIS_Z, 1U);
         } else {
+            motion_prof.axis_steps[AXIS_Z] = 0U;
             axis_z.enabled = 0U;
             axis_z.step_increment = 0U;
         }
@@ -796,15 +886,20 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
         if (spd > cap) spd = cap;
         nominal = mm_min_to_sps(master, spd);
         motion_prof.nominal_rate = nominal;
-        if (ux > 0U) motion_prof.axis_steps[AXIS_X] = ux;
-        if (uz > 0U) motion_prof.axis_steps[AXIS_Z] = uz;
+        motion_prof.axis_steps[AXIS_X] = ux;
+        motion_prof.axis_steps[AXIS_Z] = uz;
         motion_prof.master_axis = master;
         motion_apply_rates();
-        return 1U;
+        rc = 1U;
+        goto dds_retarget_exit;
     }
 
     motion_profile_extend(um, ux, uz);
-    return 1U;
+    rc = 1U;
+
+dds_retarget_exit:
+    SREG = sreg;
+    return rc;
 }
 
 void dds_motion_jog_release(void) {
@@ -813,7 +908,7 @@ void dds_motion_jog_release(void) {
 
 void dds_motion_update_target(uint8_t axis, int32_t target) {
     if (!motion_prof.active) return;
-    dds_set_target(axis, target);
+    dds_set_target(axis, target);  /* dds_set_target: cli/sei */
 }
 
 float dds_motion_get_speed_mm_min(uint8_t axis) {
@@ -840,10 +935,14 @@ uint8_t dds_motion_busy(void) {
 }
 
 void dds_motion_stop(void) {  /* сброс профиля и отключение шагов */
+    uint8_t sreg = SREG;
+
+    cli();
     motion_prof.active = 0U;
     motion_prof.jog_cruise = 0U;
     axis_x.enabled = 0U;
     axis_z.enabled = 0U;
     axis_x.step_increment = 0U;
     axis_z.step_increment = 0U;
+    SREG = sreg;
 }

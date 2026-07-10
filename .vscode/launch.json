@@ -5,10 +5,10 @@
             "name": "Wokwi GDB",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/ELS_AlexA_V2.1.ino.elf",
-            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/01_Исходный_код/ELS_AlexA_V2.1/build/ELS_AlexA_V2.1.ino.elf",
+            "cwd": "${workspaceFolder}/gdb",
             "MIMode": "gdb",
-            "miDebuggerPath": "/ignore/gdb/avr-gcc-15.2.0-x64-windows/bin/avr-gdb.exe",  // Укажите путь к GDB для вашей архитектуры
+            "miDebuggerPath": "${workspaceFolder}/ignore/gdb/avr-gcc-15.2.0-x64-windows/bin/avr-gdb.exe",
             "miDebuggerServerAddress": "localhost:3333",
             "preLaunchTask": "Arduino: Compile Mega (Wokwi)"
         }

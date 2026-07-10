@@ -82,3 +82,9 @@ void ui_encoder_reset_mpg(void) {
     hand_count_last = 0;
     sei();
 }
+
+void ui_encoder_discard_mpg_delta(void) {
+    cli();
+    hand_count_last = hand_count;
+    sei();
+}

@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 void motion_jog_init(void);       /* сброс hand_pos, MPG, нулевые координаты */
+void motion_jog_on_axis_select(uint8_t new_axis);  /* стоп MPG при смене селектора оси */
 void motion_jog_poll(void);         /* опрос РГИ (main loop) */
 void motion_jog_joy_poll(void);   /* опрос джойстика подачи */
 void motion_jog_resume(void);     /* сброс jog/MPG/go_lim после паузы FSM */

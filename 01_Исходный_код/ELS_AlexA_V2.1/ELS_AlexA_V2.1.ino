@@ -29,6 +29,7 @@
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
+#include <avr/wdt.h>
 
 static unsigned long last_lcd_ms = 0;
 static unsigned long last_pot_ms = 0;
@@ -181,6 +182,8 @@ static void lcd_format_coords_line(char *buf, size_t len) {
     snprintf(buf, len, "%s%s", lcd_xf, lcd_zf);
 }
 
+static char lcd_feed_txt[16];
+
 static void update_main_lcd(void) {
     if (planner_startup_busy()) {
         ui_lcd_set_line(0, "BL takeup...        ");
@@ -198,11 +201,10 @@ static void update_main_lcd(void) {
 
     SwitchState_t sw = ui_switches_get_state();
     uint8_t mode = fsm_manager_get_mode();
-    char feed_txt[16];
 
-    ui_pot_feed_format(feed_txt, sizeof(feed_txt), mode);
+    ui_pot_feed_format(lcd_feed_txt, sizeof(lcd_feed_txt), mode);
     lcd_format_status_line(ui_switches_get_mode_name(sw.mode),
-                           feed_txt,
+                           lcd_feed_txt,
                            submode_short(sw.submode),
                            lcd_line, sizeof(lcd_line));
     ui_lcd_set_line(0, lcd_line);
@@ -228,10 +230,20 @@ static void update_lcd(void) {
 void setup() {
     hal_init();
     debug_serial_init(SERIAL_BAUD);
+    {
+        uint8_t mcusr = MCUSR;
+        MCUSR = 0;
+#if DEBUG_ENABLED
+        debug_serial_print("RST MCUSR=");
+        Serial.println(mcusr);
+#endif
+    }
     serial_config_init();
 
+#if DEBUG_ENABLED
     debug_serial_println("");
     debug_serial_println(FIRMWARE_NAME " " FIRMWARE_STAGE " Starting...");
+#endif
 
     SETUP_MARK("cfg");
     config_load();

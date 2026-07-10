@@ -201,11 +201,20 @@ void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable)
 
 void backlash_abort_pending(void)
 {
-    if (rem_x > 0 || rem_z > 0) {
-        DBG_INFO_VAL("MOT", "BL", "ABORT", (uint32_t)(rem_x + rem_z));
-    }
+    uint8_t sreg = SREG;
+    int32_t rx;
+    int32_t rz;
+
+    cli();
+    rx = rem_x;
+    rz = rem_z;
     rem_x = 0;
     rem_z = 0;
+    SREG = sreg;
+
+    if (rx > 0 || rz > 0) {
+        DBG_INFO_VAL("MOT", "BL", "ABORT", (uint32_t)(rx + rz));
+    }
 }
 
 int32_t backlash_pending(uint8_t axis)

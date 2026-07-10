@@ -19,6 +19,7 @@ int32_t ui_encoder_peek_mpg_delta(void);
 int32_t ui_encoder_get_mpg_delta(void);
 int32_t ui_encoder_consume_mpg_tick(void);
 void ui_encoder_reset_mpg(void);
+void ui_encoder_discard_mpg_delta(void);  /* сброс pending delta без обнуления счётчика */
 
 void hand_mpg_isr_step(void);
 

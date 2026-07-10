@@ -7,6 +7,7 @@
 #include "../../config/config_backlash.h"
 #include "../debug/debug_serial.h"
 #include "../ui/ui_pot.h"
+#include <avr/interrupt.h>
 #include <math.h>
 #include <string.h>
 #include <stddef.h>
@@ -264,19 +265,38 @@ uint8_t planner_startup_busy(void) {
     return 0;
 }
 
-void planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *kind, uint8_t cruise,
-                      uint8_t lim_hit, uint8_t lim_cmp, int32_t lim_cmp_stp) {
+#define PLN_MAX_JOG_STEPS 4096U
+
+static int32_t pln_clamp_jog_target(int32_t pos, int32_t tgt) {
+    int32_t d = tgt - pos;
+
+    if (d > (int32_t)PLN_MAX_JOG_STEPS) return pos + (int32_t)PLN_MAX_JOG_STEPS;
+    if (d < -(int32_t)PLN_MAX_JOG_STEPS) return pos - (int32_t)PLN_MAX_JOG_STEPS;
+    return tgt;
+}
+
+uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *kind, uint8_t cruise,
+                         uint8_t lim_hit, uint8_t lim_cmp, int32_t lim_cmp_stp) {
     /* retarget если jog активен; иначе stop + start; cruise = MOTION_FLAG_JOG_CRUISE */
-    MotionCommand_t cmd;
+    static MotionCommand_t cmd;
     float entry = 0.0f;
     uint8_t extended;
     uint8_t master = AXIS_Z;
-    int32_t dx = tx - dds_get_position(AXIS_X);
-    int32_t dz = tz - dds_get_position(AXIS_Z);
-    uint32_t ux = (uint32_t)((dx < 0) ? -dx : dx);
-    uint32_t uz = (uint32_t)((dz < 0) ? -dz : dz);
+    int32_t cx = dds_get_position(AXIS_X);
+    int32_t cz = dds_get_position(AXIS_Z);
+    int32_t dx;
+    int32_t dz;
+    uint32_t ux;
+    uint32_t uz;
 
-    if (ux == 0U && uz == 0U) return;
+    tx = pln_clamp_jog_target(cx, tx);
+    tz = pln_clamp_jog_target(cz, tz);
+    dx = tx - cx;
+    dz = tz - cz;
+    ux = (uint32_t)((dx < 0) ? -dx : dx);
+    uz = (uint32_t)((dz < 0) ? -dz : dz);
+
+    if (ux == 0U && uz == 0U) return 0U;
 
     master = (ux >= uz) ? AXIS_X : AXIS_Z;
     speed_mm_min = cap_speed_mm_min(master, speed_mm_min);
@@ -294,7 +314,7 @@ void planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *ki
     if (extended) {
         DBG_JOG_MOVE_LIM(kind, tx, tz, speed_mm_min, 1, lim_hit, lim_cmp, lim_cmp_stp);
         block_exec = 1;
-        return;
+        return 1U;
     }
 
     if (dds_motion_busy()) {
@@ -307,24 +327,52 @@ void planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *ki
                 entry = (ex > ez) ? ex : ez;
             }
         }
-        dds_motion_stop();
-        block_exec = 0;
+        {
+            uint8_t sreg = SREG;
+
+            cli();
+            dds_motion_stop();
+            block_exec = 0;
+            cmd.entry_mm_min = cap_speed_mm_min(master, entry);
+            dds_motion_start(&cmd);
+            SREG = sreg;
+        }
+        block_exec = 1;
+        DBG_JOG_MOVE_LIM(kind, tx, tz, speed_mm_min, 0, lim_hit, lim_cmp, lim_cmp_stp);
+        return 1U;
     }
 
     cmd.entry_mm_min = cap_speed_mm_min(master, entry);
     dds_motion_start(&cmd);
     block_exec = 1;
     DBG_JOG_MOVE_LIM(kind, tx, tz, speed_mm_min, 0, lim_hit, lim_cmp, lim_cmp_stp);
+    return 1U;
+}
+
+void planner_jog_halt(void) {
+    uint8_t sreg = SREG;
+    int32_t tx;
+    int32_t tz;
+
+    cli();
+    dds_motion_stop();
+    backlash_abort_pending();
+    tx = dds_get_position(AXIS_X);
+    tz = dds_get_position(AXIS_Z);
+    dds_set_target(AXIS_X, tx);
+    dds_set_target(AXIS_Z, tz);
+    SREG = sreg;
+    block_exec = 0;
 }
 
 void planner_jog_stop(void) {
     uint8_t was_busy = dds_motion_busy();
     if (was_busy) {
-        dds_motion_jog_release();
-        block_exec = 0;
+        planner_jog_halt();
+    } else {
+        dds_set_target(AXIS_X, dds_get_position(AXIS_X));
+        dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
     }
-    dds_set_target(AXIS_X, dds_get_position(AXIS_X));
-    dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
     if (was_busy) {
         DBG_JOG_STOP(dds_get_position(AXIS_X), dds_get_position(AXIS_Z));
     }

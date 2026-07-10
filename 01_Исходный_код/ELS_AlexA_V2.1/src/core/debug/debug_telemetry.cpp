@@ -15,6 +15,7 @@ void debug_telemetry_init(void) {
 
 void debug_telemetry_log(uint8_t level, const char *module,
                          const char *component, const char *msg, uint32_t val) {
+#if DEBUG_ENABLED
     if (level > DEBUG_LEVEL) return;
 
     TelemetryEntry_t *entry = &buffer[head];
@@ -27,9 +28,17 @@ void debug_telemetry_log(uint8_t level, const char *module,
 
     head = (head + 1) % TELEMETRY_BUFFER_SIZE;
     if (count < TELEMETRY_BUFFER_SIZE) count++;
+#else
+    (void)level;
+    (void)module;
+    (void)component;
+    (void)msg;
+    (void)val;
+#endif
 }
 
 void debug_telemetry_send(void) {
+#if DEBUG_ENABLED
     uint8_t idx = (head + TELEMETRY_BUFFER_SIZE - count) % TELEMETRY_BUFFER_SIZE;
     for (uint8_t i = 0; i < count; i++) {
         TelemetryEntry_t *e = &buffer[idx];
@@ -50,6 +59,7 @@ void debug_telemetry_send(void) {
         Serial.println();
         idx = (idx + 1) % TELEMETRY_BUFFER_SIZE;
     }
+#endif
 }
 
 void debug_telemetry_clear(void) {
