@@ -23,7 +23,7 @@
 #define SPINDLE_PPR_DEFAULT             3000
 
 /* --- Торможение джойстика (шаги master-оси, 0 = мгновенный стоп) --- */
-#define JOG_DECEL_STEPS_DEFAULT         50
+#define JOG_DECEL_STEPS_DEFAULT         0
 #define JOG_DECEL_STEPS_MIN             0
 #define JOG_DECEL_STEPS_MAX             2000
 
