@@ -36,6 +36,7 @@
 #include "config_defs.h"
 #include "config_machine.h"
 #include "config_backlash.h"
+#include "config_display.h"
 
 #define STEPS_PER_MM_X config_get_steps_per_mm(AXIS_X)
 #define STEPS_PER_MM_Z config_get_steps_per_mm(AXIS_Z)

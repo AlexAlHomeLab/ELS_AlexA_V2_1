@@ -33,6 +33,11 @@ static unsigned long last_lcd_ms = 0;
 static unsigned long last_pot_ms = 0;
 static uint8_t startup_armed = 0;
 static char lcd_line[LCD_COLS + 1];
+static char lcd_xf[11];
+static char lcd_zf[11];
+static char lcd_mpg[LCD_COLS + 1];
+
+#define SETUP_MARK(tag) DBG_INFO("SYS", "SETUP", tag)
 
 static const char *submode_short(uint8_t sub) {
     if (sub == SUB_EXT) return "Ext";
@@ -62,28 +67,130 @@ static void lcd_format_status_line(const char *mode, const char *feed, const cha
     buf[LCD_COLS] = 0;
 }
 
-static int lcd_format_coord(char *dst, size_t len, char axis, long val) {
-    if (val < 0) {
-        return snprintf(dst, len, "%c-%07ld", axis, -val);
+static void lcd_trim_decimal_leading_zeros(char *raw) {
+    char *dot = strchr(raw, '.');
+    if (dot == NULL || dot <= raw) {
+        return;
     }
-    return snprintf(dst, len, "%c %07ld", axis, val);
+    char *p = raw;
+    while (p < dot - 1 && *p == '0') {
+        p++;
+    }
+    if (p == dot) {
+        p--;
+    }
+    if (p > raw) {
+        memmove(raw, p, strlen(p) + 1U);
+    }
+}
+
+static void lcd_format_decimal_num(char *dst, uint32_t whole, uint32_t frac) {
+    char raw[12];
+    snprintf(raw, sizeof(raw), "%lu.%03lu", (unsigned long)whole, (unsigned long)(frac % 1000U));
+    lcd_trim_decimal_leading_zeros(raw);
+
+    size_t n = strlen(raw);
+    memset(dst, ' ', 7);
+    if (n >= 7U) {
+        memcpy(dst, raw + n - 7U, 7);
+    } else {
+        memcpy(dst + 7U - n, raw, n);
+    }
+    dst[7] = 0;
+}
+
+static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units,
+                              uint32_t *whole, uint32_t *frac, int8_t *neg) {
+    uint32_t abs_s = (steps < 0) ? (uint32_t)(-steps) : (uint32_t)steps;
+    uint16_t ms = config_get_motor_steps(axis);
+    uint8_t ustep = config_get_microstep(axis);
+    uint16_t pitch = config_get_screw_pitch(axis);
+    uint32_t den;
+    uint32_t val1000;
+
+    *neg = (steps < 0) ? -1 : 1;
+    *whole = 0;
+    *frac = 0;
+    if (abs_s == 0U || ms == 0U || ustep == 0U || pitch == 0U) {
+        return;
+    }
+
+    den = (uint32_t)ms * (uint32_t)ustep * 100UL;
+    if (den == 0U) {
+        return;
+    }
+
+    val1000 = (abs_s / den) * (uint32_t)pitch * 1000UL;
+    val1000 += (((uint32_t)(abs_s % den) * (uint32_t)pitch * 1000UL) / den);
+    if (units == COORD_UNIT_INCH) {
+        val1000 = (val1000 * 10000UL + 127000UL) / 254000UL;
+    }
+    *whole = val1000 / 1000UL;
+    *frac = val1000 % 1000UL;
+}
+
+static void lcd_format_axis_field(char *dst, char axis, int32_t steps, char mark) {
+    uint8_t units = config_get_coord_units();
+    uint8_t axis_id = (axis == 'X') ? AXIS_X : AXIS_Z;
+
+    if (units == COORD_UNIT_STEPS) {
+        if (steps < 0) {
+            snprintf(dst, 11, "%c-%07ld%c", axis, -(long)steps, mark);
+        } else {
+            snprintf(dst, 11, "%c %07ld%c", axis, (long)steps, mark);
+        }
+        return;
+    }
+
+    uint32_t whole;
+    uint32_t frac;
+    int8_t neg;
+    char num[8];
+
+    lcd_steps_to_parts(steps, axis_id, units, &whole, &frac, &neg);
+    lcd_format_decimal_num(num, whole, frac);
+
+    dst[0] = axis;
+    dst[1] = (neg < 0) ? '-' : ' ';
+    memcpy(dst + 2, num, 7);
+    dst[9] = mark;
+    dst[10] = 0;
+}
+
+static void lcd_format_mpg_line(char axis, long hand) {
+    int n;
+
+    memset(lcd_mpg, ' ', LCD_COLS);
+    n = snprintf(lcd_mpg, LCD_COLS, "MPG %c %+ld", axis, hand);
+    if (n < 0) {
+        n = 0;
+    }
+    if ((uint8_t)n < LCD_COLS) {
+        lcd_mpg[n] = ' ';
+    }
+    lcd_mpg[LCD_COLS - 1] = config_coord_unit_flag();
+    lcd_mpg[LCD_COLS] = 0;
 }
 
 static void lcd_format_coords_line(char *buf, size_t len) {
-    char xp[10];
-    char zp[10];
-    lcd_format_coord(xp, sizeof(xp), 'X', (long)motion_get_pos_steps(AXIS_X));
-    lcd_format_coord(zp, sizeof(zp), 'Z', (long)motion_get_pos_steps(AXIS_Z));
-    snprintf(buf, len, "%s %s", xp, zp);
+    int32_t xs = motion_get_pos_steps(AXIS_X);
+    int32_t zs = motion_get_pos_steps(AXIS_Z);
+    lcd_format_axis_field(lcd_xf, 'X', xs, limits_lcd_marker(AXIS_X));
+    lcd_format_axis_field(lcd_zf, 'Z', zs, limits_lcd_marker(AXIS_Z));
+    snprintf(buf, len, "%s%s", lcd_xf, lcd_zf);
 }
 
 static void update_main_lcd(void) {
     if (backlash_startup_busy()) {
         ui_lcd_set_line(0, "BL takeup...        ");
-        ui_lcd_set_line(1, "Wait                ");
+        memset(lcd_line, ' ', LCD_COLS);
+        memcpy(lcd_line, "Wait", 4);
+        lcd_line[LCD_COLS - 1] = config_coord_unit_flag();
+        lcd_line[LCD_COLS] = 0;
+        ui_lcd_set_line_raw(1, lcd_line);
         ui_lcd_clear_line(2);
         lcd_format_coords_line(lcd_line, sizeof(lcd_line));
-        ui_lcd_set_line(3, lcd_line);
+        ui_lcd_set_line_raw(3, lcd_line);
         ui_lcd_clear_cursor();
         return;
     }
@@ -91,7 +198,6 @@ static void update_main_lcd(void) {
     SwitchState_t sw = ui_switches_get_state();
     uint8_t mode = fsm_manager_get_mode();
     char feed_txt[16];
-    char mpg_txt[16];
 
     ui_pot_feed_format(feed_txt, sizeof(feed_txt), mode);
     lcd_format_status_line(ui_switches_get_mode_name(sw.mode),
@@ -101,12 +207,12 @@ static void update_main_lcd(void) {
     ui_lcd_set_line(0, lcd_line);
 
     char axis = (sw.mpg_axis == AXIS_X) ? 'X' : 'Z';
-    snprintf(mpg_txt, sizeof(mpg_txt), "MPG %c %+ld", axis, (long)motion_jog_get_hand(sw.mpg_axis));
-    ui_lcd_set_line(1, mpg_txt);
+    lcd_format_mpg_line(axis, (long)motion_jog_get_hand(sw.mpg_axis));
+    ui_lcd_set_line_raw(1, lcd_mpg);
     ui_lcd_clear_line(2);
 
     lcd_format_coords_line(lcd_line, sizeof(lcd_line));
-    ui_lcd_set_line(3, lcd_line);
+    ui_lcd_set_line_raw(3, lcd_line);
     ui_lcd_clear_cursor();
 }
 
@@ -126,24 +232,40 @@ void setup() {
     debug_serial_println("");
     debug_serial_println(FIRMWARE_NAME " " FIRMWARE_STAGE " Starting...");
 
+    SETUP_MARK("cfg");
     config_load();
+    SETUP_MARK("mot");
     motion_init();
-    timer1_init(STEP_ISR_PERIOD_US);
+    SETUP_MARK("jog");
     motion_jog_init();
 
+    SETUP_MARK("lcd");
     ui_lcd_init();
+    SETUP_MARK("sw");
     ui_switches_init();
+    SETUP_MARK("btn");
     ui_buttons_init();
+    SETUP_MARK("lim");
     limits_ui_init();
+    SETUP_MARK("pot");
     ui_pot_init();
+    SETUP_MARK("enc");
     ui_encoder_init();
+    SETUP_MARK("menu");
     ui_menu_init();
+    SETUP_MARK("fsm");
     fsm_manager_init();
+    SETUP_MARK("spd");
     spindle_init();
+    SETUP_MARK("isr");
     encoder_interrupts_init();
 
+    SETUP_MARK("draw");
     update_lcd();
     ui_lcd_update();
+
+    SETUP_MARK("t1");
+    timer1_init(STEP_ISR_PERIOD_US);
 
     DBG_INFO("SYS", "INIT", "Stage 2.2f ready");
 }
@@ -151,7 +273,6 @@ void setup() {
 void loop() {
     if (!startup_armed) {
         startup_armed = 1;
-        delay(100);
         backlash_startup_begin();
     }
 

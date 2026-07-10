@@ -41,6 +41,12 @@ void ui_lcd_set_line(uint8_t line, const char *text) {
     lcd_buffer[line][LCD_COLS] = '\0';
 }
 
+void ui_lcd_set_line_raw(uint8_t line, const char *text) {
+    if (line >= LCD_ROWS || text == NULL) return;
+    memcpy(lcd_buffer[line], text, LCD_COLS);
+    lcd_buffer[line][LCD_COLS] = '\0';
+}
+
 void ui_lcd_clear_line(uint8_t line) {
     if (line >= LCD_ROWS) return;
     memset(lcd_buffer[line], ' ', LCD_COLS);

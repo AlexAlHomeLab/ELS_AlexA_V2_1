@@ -90,7 +90,6 @@ static void backlash_queue_takeup(uint8_t axis, uint8_t dir, int32_t steps)
         return;
     }
     *rem = steps;
-    DBG_BL("ARM", axis, dir, steps);
 }
 
 void backlash_reload_steps(void)
@@ -126,7 +125,6 @@ static void backlash_startup_axis_begin(uint8_t axis)
     dds_set_speed(axis, sps);
     dds_enable(axis, 1);
     bl_startup_axis = axis;
-    DBG_BL("ARM", axis, ref, steps);
 }
 
 static void backlash_startup_axis_stop(uint8_t axis)
@@ -218,7 +216,6 @@ void backlash_sync_axis(uint8_t axis, uint8_t dir)
         synced_z = 1;
         rem_z = 0;
     }
-    DBG_BL("SYNC", axis, dir, 0);
 }
 
 void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable)

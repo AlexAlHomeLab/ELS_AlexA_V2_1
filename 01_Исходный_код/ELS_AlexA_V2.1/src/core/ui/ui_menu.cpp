@@ -4,6 +4,7 @@
 #include "../../config/config.h"
 #include "../../config/config_feed.h"
 #include "../../config/config_backlash.h"
+#include "../../config/config_display.h"
 #include "../../config/config_storage.h"
 #include "../debug/debug_serial.h"
 #include "../hal/hal_pins.h"
@@ -14,7 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MENU_PARAM_COUNT 24
+#define MENU_PARAM_COUNT 25
 #define MENU_EDIT_LEN 8
 
 #define MENU_MODE_BROWSE 0
@@ -57,6 +58,7 @@ static uint8_t edit_bl_auto = BACKLASH_AUTO_DEFAULT;
 static uint16_t edit_bl_x = BACKLASH_X_STEPS_DEFAULT;
 static uint16_t edit_bl_z = BACKLASH_Z_STEPS_DEFAULT;
 static uint16_t edit_bl_speed = BACKLASH_AUTO_SPEED_DEFAULT;
+static uint8_t edit_coord_units = COORD_UNIT_DEFAULT;
 
 
 typedef enum {
@@ -98,6 +100,7 @@ static const ParamDef_t param_def[MENU_PARAM_COUNT] = {
     {"BlX", PTYPE_UINT, 0, BACKLASH_STEPS_MAX},
     {"BlZ", PTYPE_UINT, 0, BACKLASH_STEPS_MAX},
     {"BlSp", PTYPE_UINT, BACKLASH_AUTO_SPEED_MIN, BACKLASH_AUTO_SPEED_MAX},
+    {"CrdU", PTYPE_UINT, 0, 2},
 };
 
 static void ui_buzzer_beep(void) {
@@ -137,6 +140,7 @@ static uint8_t *menu_param_ptr_u8(uint8_t idx) {
     case 18: return &edit_z_dir_inv;
     case 19: return &edit_x_dir_inv;
     case 20: return &edit_bl_auto;
+    case 24: return &edit_coord_units;
     default: return NULL;
     }
 }
@@ -184,6 +188,7 @@ static void menu_load_values(void) {
     edit_bl_x = config_backlash_get_steps_x();
     edit_bl_z = config_backlash_get_steps_z();
     edit_bl_speed = config_backlash_get_auto_speed();
+    edit_coord_units = config_get_coord_units();
 }
 
 static void menu_value_to_edit_buf(uint8_t idx) {
@@ -552,6 +557,9 @@ static void menu_save_all(void) {
     config_backlash_set_auto_speed(edit_bl_speed);
     config_backlash_save();
     backlash_reload_steps();
+
+    config_set_coord_units((uint8_t)edit_coord_units);
+    config_display_save();
 
     config_set_buzzer_on(edit_buzzer);
     config_save();

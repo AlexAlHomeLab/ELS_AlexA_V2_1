@@ -129,6 +129,19 @@ uint8_t limits_ui_led_on(uint8_t idx) {
     return (idx < 4) ? limit_active[idx] : 0;
 }
 
+char limits_lcd_marker(uint8_t axis) {
+    int32_t pos = read_axis_pos(axis);
+
+    if (axis == AXIS_X) {
+        if (limit_active[3] && pos == limit_pos[3]) return 'B';
+        if (limit_active[1] && pos == limit_pos[1]) return 'F';
+    } else if (axis == AXIS_Z) {
+        if (limit_active[0] && pos == limit_pos[0]) return '<';
+        if (limit_active[2] && pos == limit_pos[2]) return '>';
+    }
+    return ' ';
+}
+
 void limits_rebase_axis(uint8_t axis, int32_t old_pos) {
     if (axis == AXIS_Z) {
         if (limit_active[0]) limit_pos[0] -= old_pos;

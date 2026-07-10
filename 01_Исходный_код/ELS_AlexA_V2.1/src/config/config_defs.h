@@ -56,10 +56,16 @@
 #define BACKLASH_Z_CENTIMM            46
 #define BACKLASH_STEPS_MAX            5000
 /* Автовыборка при включении (EEPROM $40 / меню BlAu) */
-#define BACKLASH_AUTO_DEFAULT         1
+#define BACKLASH_AUTO_DEFAULT         0
 #define BACKLASH_AUTO_SPEED_DEFAULT   50
 #define BACKLASH_AUTO_SPEED_MIN       5
 #define BACKLASH_AUTO_SPEED_MAX       200
+
+/* --- Единицы отображения координат (EEPROM $44 / меню CrdU) --- */
+#define COORD_UNIT_STEPS              0
+#define COORD_UNIT_MM                 1
+#define COORD_UNIT_INCH               2
+#define COORD_UNIT_DEFAULT            COORD_UNIT_MM
 
 /* --- Телеметрия --- */
 #define TELEMETRY_BUFFER_SIZE 64

@@ -3,6 +3,7 @@
 #include "../../config/config_feed.h"
 #include "../../config/config_machine.h"
 #include "../../config/config_backlash.h"
+#include "../../config/config_display.h"
 #include "../../config/config_storage.h"
 #include "../fsm/fsm_core.h"
 #include "../fsm/fsm_manager.h"
@@ -90,6 +91,7 @@ static int setting_get(uint8_t id, char *buf, size_t len) {
     case 41: snprintf(buf, len, "%u", config_backlash_get_steps_x()); return 1;
     case 42: snprintf(buf, len, "%u", config_backlash_get_steps_z()); return 1;
     case 43: snprintf(buf, len, "%u", config_backlash_get_auto_speed()); return 1;
+    case 44: snprintf(buf, len, "%u", config_get_coord_units()); return 1;
     default: return 0;
     }
 }
@@ -238,6 +240,12 @@ static int setting_set(uint8_t id, const char *val) {
         config_backlash_set_auto_speed(u16);
         config_backlash_save();
         return 1;
+    case 44:
+        if (!parse_u16(val, &u16)) return 0;
+        if (u16 > COORD_UNIT_INCH) return 0;
+        config_set_coord_units((uint8_t)u16);
+        config_display_save();
+        return 1;
     default:
         return 0;
     }
@@ -258,7 +266,8 @@ static void print_all_settings(void) {
         10, 11, 12, 13, 14, 15, 16, 17,
         20, 21, 22, 23, 24, 25, 26, 27,
         30, 31,
-        40, 41, 42, 43
+        40, 41, 42, 43,
+        44
     };
     for (uint8_t i = 0; i < sizeof(ids); i++) {
         print_setting(ids[i]);
@@ -286,6 +295,7 @@ static void cmd_help(void) {
     Serial.println(F("$30 spindle PPR, $31 buzzer"));
     Serial.println(F("$40 backlash auto, $41-$42 X/Z steps"));
     Serial.println(F("$43 backlash auto speed mm/min"));
+    Serial.println(F("$44 coord units 0=steps 1=mm 2=inch"));
     Serial.println(F("$$ all, $n query, $n=val set, $I info, ? status"));
 }
 
