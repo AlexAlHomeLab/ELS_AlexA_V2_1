@@ -71,6 +71,22 @@ void debug_log_event_val(uint8_t level, const char *module, const char *componen
 #endif
 }
 
+void debug_log_event_val_i32(uint8_t level, const char *module, const char *component, const char *msg, int32_t val) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || level > DEBUG_LEVEL) return;
+    Serial.print("[");
+    Serial.print(level_tag(level));
+    Serial.print("] [");
+    Serial.print(module);
+    Serial.print("] [");
+    Serial.print(component);
+    Serial.print("] ");
+    Serial.print(msg);
+    Serial.print(' ');
+    Serial.println(val);
+#endif
+}
+
 void debug_log_jog(int32_t steps, uint8_t axis, int32_t coord_steps) {
 #if DEBUG_ENABLED
     if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;

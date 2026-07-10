@@ -158,7 +158,7 @@ void motion_jog_go_limit(uint8_t idx) {
     dds_set_target(axis, target);
     dds_enable(axis, 1);
     dds_set_speed(axis, jog_speed_sps(axis, 1));
-    DBG_INFO_VAL("JOG", "GOLIM", "tgt", (uint32_t)target);
+    DBG_INFO_VAL_I32("JOG", "GOLIM", "tgt", target);
 }
 
 void motion_jog_go_limit_latch(uint8_t idx) {
@@ -180,7 +180,7 @@ void motion_jog_go_limit_latch(uint8_t idx) {
     dds_set_target(axis, target);
     dds_enable(axis, 1);
     dds_set_speed(axis, jog_speed_sps(axis, 0));
-    DBG_INFO_VAL("JOG", "LATCH", "tgt", (uint32_t)target);
+    DBG_INFO_VAL_I32("JOG", "LATCH", "tgt", target);
 }
 
 void motion_jog_resume(void) {

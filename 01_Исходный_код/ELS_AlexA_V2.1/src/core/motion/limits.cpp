@@ -88,7 +88,7 @@ void limits_ui_on_click(uint8_t idx) {
     limit_pos[idx] = pos;
     LIMIT_LED_ON(limit_led_pins[idx]);
     backlash_sync_axis(limit_idx_to_axis(idx), dds_get_direction(limit_idx_to_axis(idx)));
-    DBG_INFO_VAL("UI", "LIM", limit_names[idx], (uint32_t)pos);
+    DBG_INFO_VAL_I32("UI", "LIM", limit_names[idx], pos);
     limit_beep();
 }
 
