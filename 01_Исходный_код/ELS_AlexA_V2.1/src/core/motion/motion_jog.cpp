@@ -1,6 +1,7 @@
 #include "motion_jog.h"
 #include "motion_control.h"
 #include "stepper_gen.h"
+#include "backlash.h"
 #include "../../config/config.h"
 #include "../../config/config_machine.h"
 #include "../debug/debug_serial.h"
@@ -90,6 +91,13 @@ static int32_t jog_clamp_target(uint8_t axis, int32_t target, uint8_t rapid) {
     return limits_clamp_steps(axis, target);
 }
 
+static void jog_arm_backlash(uint8_t axis, int32_t cur, int32_t target) {
+    if (target == cur) return;
+    uint8_t fwd = (target > cur) ? 1U : 0U;
+    backlash_arm_axis(axis, fwd, 1);
+    dds_set_direction(axis, fwd);
+}
+
 void motion_jog_init(void) {
     hand_pos[AXIS_X] = 0;
     hand_pos[AXIS_Z] = 0;
@@ -128,6 +136,7 @@ void motion_jog_zero_axis(uint8_t axis) {
     motion_set_pos_steps(axis, 0);
     hand_pos[axis] = 0;
     ui_encoder_reset_mpg();
+    backlash_sync_axis(axis, dds_get_direction(axis));
 }
 
 void motion_jog_go_limit(uint8_t idx) {
@@ -144,6 +153,8 @@ void motion_jog_go_limit(uint8_t idx) {
     go_lim_latch = 0;
     go_lim_joy_arm = 1;
 
+    int32_t cur = motion_get_pos_steps(axis);
+    jog_arm_backlash(axis, cur, target);
     dds_set_target(axis, target);
     dds_enable(axis, 1);
     dds_set_speed(axis, jog_speed_sps(axis, 1));
@@ -164,6 +175,8 @@ void motion_jog_go_limit_latch(uint8_t idx) {
     go_lim_latch = 1;
     go_lim_joy_arm = 0;
 
+    int32_t cur = motion_get_pos_steps(axis);
+    jog_arm_backlash(axis, cur, target);
     dds_set_target(axis, target);
     dds_enable(axis, 1);
     dds_set_speed(axis, jog_speed_sps(axis, 0));
@@ -241,9 +254,11 @@ void motion_jog_joy_poll(void) {
 
     uint8_t z_on = (z_sign != 0);
     uint8_t x_on = (x_sign != 0);
+    uint8_t was_z_on = joy_z_on;
+    uint8_t was_x_on = joy_x_on;
 
-    if (z_on && !joy_z_on) hand_reset_axis(AXIS_Z);
-    if (x_on && !joy_x_on) hand_reset_axis(AXIS_X);
+    if (z_on && !was_z_on) hand_reset_axis(AXIS_Z);
+    if (x_on && !was_x_on) hand_reset_axis(AXIS_X);
 
     joy_z_on = z_on;
     joy_x_on = x_on;
@@ -258,15 +273,21 @@ void motion_jog_joy_poll(void) {
     int32_t chunk_x = joy_chunk(AXIS_X, btn.joy_rapid);
 
     if (z_on) {
-        int32_t target = jog_clamp_target(AXIS_Z,
-            motion_get_pos_steps(AXIS_Z) + z_sign * chunk_z, btn.joy_rapid);
+        int32_t cur = motion_get_pos_steps(AXIS_Z);
+        int32_t target = jog_clamp_target(AXIS_Z, cur + z_sign * chunk_z, btn.joy_rapid);
+        if (!was_z_on) {
+            jog_arm_backlash(AXIS_Z, cur, target);
+        }
         dds_set_target(AXIS_Z, target);
         dds_enable(AXIS_Z, 1);
         dds_set_speed(AXIS_Z, jog_speed_sps(AXIS_Z, btn.joy_rapid));
     }
     if (x_on) {
-        int32_t target = jog_clamp_target(AXIS_X,
-            motion_get_pos_steps(AXIS_X) + x_sign * chunk_x, btn.joy_rapid);
+        int32_t cur = motion_get_pos_steps(AXIS_X);
+        int32_t target = jog_clamp_target(AXIS_X, cur + x_sign * chunk_x, btn.joy_rapid);
+        if (!was_x_on) {
+            jog_arm_backlash(AXIS_X, cur, target);
+        }
         dds_set_target(AXIS_X, target);
         dds_enable(AXIS_X, 1);
         dds_set_speed(AXIS_X, jog_speed_sps(AXIS_X, btn.joy_rapid));
@@ -297,6 +318,7 @@ void motion_jog_poll(void) {
     (void)ui_encoder_get_mpg_delta();
     hand_pos[axis] += actual;
 
+    jog_arm_backlash(axis, cur, target);
     dds_set_target(axis, target);
     dds_enable(axis, 1);
     dds_set_speed(axis, jog_speed_sps(axis, btn.joy_rapid));

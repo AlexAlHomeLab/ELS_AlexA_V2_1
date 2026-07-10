@@ -1,5 +1,6 @@
 #include "stepper_gen.h"
 #include "../hal/hal_pins.h"
+#include "backlash.h"
 #include "../../config/config.h"
 #include <string.h>
 
@@ -49,14 +50,20 @@ static void step_x_off(void) { STEP_X_OFF(); }
 static void step_z_on(void) { STEP_Z_ON(); }
 static void step_z_off(void) { STEP_Z_OFF(); }
 
-static void dds_axis_step(AxisState_t *a, void (*step_on)(void), void (*step_off)(void),
+static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), void (*step_off)(void),
                           void (*dir_set)(uint8_t)) {
     if (!a->enabled || a->step_increment == 0) return;
-    if (a->position == a->target_position) return;
+    if (a->position == a->target_position && backlash_pending(axis) <= 0) return;
 
-    uint8_t fwd = a->target_position > a->position;
-    if (a->direction != fwd) {
-        a->direction = fwd;
+    uint8_t fwd = a->direction;
+    if (a->position != a->target_position) {
+        fwd = (a->target_position > a->position) ? 1U : 0U;
+        if (a->direction != fwd) {
+            a->direction = fwd;
+            dir_set(fwd);
+            backlash_arm_axis(axis, fwd, 1);
+        }
+    } else {
         dir_set(fwd);
     }
 
@@ -64,14 +71,16 @@ static void dds_axis_step(AxisState_t *a, void (*step_on)(void), void (*step_off
     if (a->accumulator >= 0x80000000UL) {
         a->accumulator -= 0x80000000UL;
         step_on();
-        a->position += fwd ? 1 : -1;
+        if (!backlash_consume_step(axis, fwd)) {
+            a->position += fwd ? 1 : -1;
+        }
         step_off();
     }
 }
 
 void stepper_generate_steps(void) {
-    dds_axis_step(&axis_x, step_x_on, step_x_off, dir_x_set);
-    dds_axis_step(&axis_z, step_z_on, step_z_off, dir_z_set);
+    dds_axis_step(AXIS_X, &axis_x, step_x_on, step_x_off, dir_x_set);
+    dds_axis_step(AXIS_Z, &axis_z, step_z_on, step_z_off, dir_z_set);
 }
 
 int32_t dds_get_position(uint8_t axis) {
@@ -95,7 +104,13 @@ int32_t dds_get_target(uint8_t axis) {
 
 uint8_t dds_at_target(uint8_t axis) {
     AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
+    if (backlash_pending(axis) > 0) return 0;
     return a->position == a->target_position;
+}
+
+uint8_t dds_get_direction(uint8_t axis) {
+    AxisState_t *a = (axis == AXIS_X) ? &axis_x : &axis_z;
+    return a->direction;
 }
 
 void dds_reset_accumulator(void) {

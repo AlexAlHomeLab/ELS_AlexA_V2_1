@@ -39,10 +39,27 @@
 #endif
 #endif
 
-/* --- Люфт --- */
-#define ENABLE_BACKLASH 0
-#define BACKLASH_X      0
-#define BACKLASH_Z      0
+/* --- Компенсация люфта (ТЗ: выборка при смене направления, ENABLE_BACKLASH=0 откл.) --- */
+#define ENABLE_BACKLASH         1
+#define BACKLASH_DIR_POS        1   /* направление увеличения координаты */
+#define BACKLASH_DIR_NEG        0
+#define BACKLASH_REF_DIR_X      BACKLASH_DIR_NEG
+#define BACKLASH_REF_DIR_Z      BACKLASH_DIR_NEG
+#define BACKLASH_FIRST_SKIP     0
+#define BACKLASH_FIRST_ALWAYS   1   /* первый ход после вкл. — выборка (ТЗ) */
+#define BACKLASH_FIRST_REF      2
+#define BACKLASH_FIRST_MOVE     BACKLASH_FIRST_ALWAYS
+/* Дистанция выборки по умолчанию (импульсы); EEPROM переопределяет */
+#define BACKLASH_X_STEPS_DEFAULT    100
+#define BACKLASH_Z_STEPS_DEFAULT    100
+#define BACKLASH_X_CENTIMM            34
+#define BACKLASH_Z_CENTIMM            46
+#define BACKLASH_STEPS_MAX            5000
+/* Автовыборка при включении (EEPROM $40 / меню BlAu) */
+#define BACKLASH_AUTO_DEFAULT         1
+#define BACKLASH_AUTO_SPEED_DEFAULT   50
+#define BACKLASH_AUTO_SPEED_MIN       5
+#define BACKLASH_AUTO_SPEED_MAX       200
 
 /* --- Телеметрия --- */
 #define TELEMETRY_BUFFER_SIZE 64

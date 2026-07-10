@@ -68,6 +68,7 @@ void config_load(void) {
 
     config_feed_load();
     config_machine_load();
+    config_backlash_load();
 }
 
 void config_save(void) {

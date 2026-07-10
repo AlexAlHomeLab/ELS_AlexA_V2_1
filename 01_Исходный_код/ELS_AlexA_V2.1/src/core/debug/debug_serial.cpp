@@ -84,3 +84,20 @@ void debug_log_jog(int32_t steps, uint8_t axis, int32_t coord_steps) {
     Serial.println(coord_steps);
 #endif
 }
+
+void debug_log_backlash(const char *evt, uint8_t axis, uint8_t dir, int32_t val) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    Serial.print("[INFO] [MOT] [BL] ");
+    Serial.print(evt);
+    Serial.print(' ');
+    Serial.print(axis == AXIS_X ? 'X' : 'Z');
+    Serial.print(" dir");
+    Serial.print(dir ? '+' : '-');
+    if (val != 0) {
+        Serial.print(" val ");
+        Serial.print(val);
+    }
+    Serial.println();
+#endif
+}

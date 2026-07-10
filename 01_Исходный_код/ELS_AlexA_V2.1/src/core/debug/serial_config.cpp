@@ -2,9 +2,11 @@
 #include "../../config/config.h"
 #include "../../config/config_feed.h"
 #include "../../config/config_machine.h"
+#include "../../config/config_backlash.h"
 #include "../../config/config_storage.h"
 #include "../fsm/fsm_core.h"
 #include "../fsm/fsm_manager.h"
+#include "../motion/backlash.h"
 #include "../motion/motion_control.h"
 #include "../process/spindle_control.h"
 #include "../ui/ui_pot.h"
@@ -84,6 +86,10 @@ static int setting_get(uint8_t id, char *buf, size_t len) {
     case 26: format_spm(buf, len, AXIS_X); return 1;
     case 30: snprintf(buf, len, "%u", config_get_spindle_ppr()); return 1;
     case 31: snprintf(buf, len, "%u", config_get_buzzer_on()); return 1;
+    case 40: snprintf(buf, len, "%u", config_backlash_get_auto_on()); return 1;
+    case 41: snprintf(buf, len, "%u", config_backlash_get_steps_x()); return 1;
+    case 42: snprintf(buf, len, "%u", config_backlash_get_steps_z()); return 1;
+    case 43: snprintf(buf, len, "%u", config_backlash_get_auto_speed()); return 1;
     default: return 0;
     }
 }
@@ -211,6 +217,27 @@ static int setting_set(uint8_t id, const char *val) {
         config_set_buzzer_on((val[0] == '1') ? 1U : 0U);
         config_save();
         return 1;
+    case 40:
+        config_backlash_set_auto_on((val[0] == '1') ? 1U : 0U);
+        config_backlash_save();
+        return 1;
+    case 41:
+        if (!parse_u16(val, &u16)) return 0;
+        config_backlash_set_steps_x(u16);
+        config_backlash_save();
+        backlash_reload_steps();
+        return 1;
+    case 42:
+        if (!parse_u16(val, &u16)) return 0;
+        config_backlash_set_steps_z(u16);
+        config_backlash_save();
+        backlash_reload_steps();
+        return 1;
+    case 43:
+        if (!parse_u16(val, &u16)) return 0;
+        config_backlash_set_auto_speed(u16);
+        config_backlash_save();
+        return 1;
     default:
         return 0;
     }
@@ -230,7 +257,8 @@ static void print_all_settings(void) {
         0, 1, 2, 3,
         10, 11, 12, 13, 14, 15, 16, 17,
         20, 21, 22, 23, 24, 25, 26, 27,
-        30, 31
+        30, 31,
+        40, 41, 42, 43
     };
     for (uint8_t i = 0; i < sizeof(ids); i++) {
         print_setting(ids[i]);
@@ -256,6 +284,8 @@ static void cmd_help(void) {
     Serial.println(F("$20-$25 X motor/ustep/pitch/max/rapid/accel"));
     Serial.println(F("$26 X steps/mm, $27 X dir invert"));
     Serial.println(F("$30 spindle PPR, $31 buzzer"));
+    Serial.println(F("$40 backlash auto, $41-$42 X/Z steps"));
+    Serial.println(F("$43 backlash auto speed mm/min"));
     Serial.println(F("$$ all, $n query, $n=val set, $I info, ? status"));
 }
 

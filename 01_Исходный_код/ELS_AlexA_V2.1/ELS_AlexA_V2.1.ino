@@ -12,6 +12,7 @@
 #include "src/core/hal/hal_timers.h"
 #include "src/core/fsm/fsm_manager.h"
 #include "src/core/motion/limits.h"
+#include "src/core/motion/backlash.h"
 #include "src/core/motion/motion_control.h"
 #include "src/core/motion/motion_jog.h"
 #include "src/core/motion/stepper_gen.h"
@@ -30,6 +31,7 @@
 
 static unsigned long last_lcd_ms = 0;
 static unsigned long last_pot_ms = 0;
+static uint8_t startup_armed = 0;
 static char lcd_line[LCD_COLS + 1];
 
 static const char *submode_short(uint8_t sub) {
@@ -76,6 +78,16 @@ static void lcd_format_coords_line(char *buf, size_t len) {
 }
 
 static void update_main_lcd(void) {
+    if (backlash_startup_busy()) {
+        ui_lcd_set_line(0, "BL takeup...        ");
+        ui_lcd_set_line(1, "Wait                ");
+        ui_lcd_clear_line(2);
+        lcd_format_coords_line(lcd_line, sizeof(lcd_line));
+        ui_lcd_set_line(3, lcd_line);
+        ui_lcd_clear_cursor();
+        return;
+    }
+
     SwitchState_t sw = ui_switches_get_state();
     uint8_t mode = fsm_manager_get_mode();
     char feed_txt[16];
@@ -116,8 +128,8 @@ void setup() {
 
     config_load();
     motion_init();
-    motion_jog_init();
     timer1_init(STEP_ISR_PERIOD_US);
+    motion_jog_init();
 
     ui_lcd_init();
     ui_switches_init();
@@ -137,7 +149,14 @@ void setup() {
 }
 
 void loop() {
+    if (!startup_armed) {
+        startup_armed = 1;
+        delay(100);
+        backlash_startup_begin();
+    }
+
     estop_check();
+    backlash_startup_poll();
     ui_buttons_poll();
     ui_switches_poll();
     fsm_manager_poll();

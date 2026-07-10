@@ -1,5 +1,6 @@
 #include "planner.h"
 #include "stepper_gen.h"
+#include "backlash.h"
 #include "limits.h"
 #include "../../config/config.h"
 #include "../../config/config_machine.h"
@@ -57,6 +58,15 @@ static void planner_start_block(PlannerBlock_t *b) {
 
     if (um == 0) {
         return;
+    }
+
+    if (dx != 0) {
+        backlash_arm_axis(AXIS_X, (dx > 0) ? 1U : 0U, 1);
+        dds_set_direction(AXIS_X, (dx > 0) ? 1U : 0U);
+    }
+    if (dz != 0) {
+        backlash_arm_axis(AXIS_Z, (dz > 0) ? 1U : 0U, 1);
+        dds_set_direction(AXIS_Z, (dz > 0) ? 1U : 0U);
     }
 
     uint32_t base_sps = mm_min_to_sps(AXIS_Z, b->speed);

@@ -1,6 +1,7 @@
 #include "fsm_manager.h"
 #include "fsm_core.h"
 #include "../debug/debug_serial.h"
+#include "../motion/backlash.h"
 #include "../motion/motion_jog.h"
 #include "../motion/planner.h"
 #include "../process/estop_control.h"
@@ -95,6 +96,10 @@ void fsm_manager_poll(void) {
 }
 
 void fsm_manager_process(void) {
+    if (backlash_startup_busy()) {
+        return;
+    }
+
     State_t st = fsm_get_state();
 
     if (st == STATE_ERROR) {

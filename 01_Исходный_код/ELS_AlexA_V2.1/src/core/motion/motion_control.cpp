@@ -28,6 +28,7 @@ void motion_move_rel(float dx, float dz, float speed) {
 
 void motion_stop(void) {
     planner_stop_all();
+    backlash_abort_pending();
     dds_set_target(AXIS_X, dds_get_position(AXIS_X));
     dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
     dds_enable(AXIS_X, 0);
@@ -59,6 +60,12 @@ void motion_set_pos_steps(uint8_t axis, int32_t steps) {
 void motion_zero_all(void) {
     motion_set_pos_steps(AXIS_X, 0);
     motion_set_pos_steps(AXIS_Z, 0);
+#if ENABLE_BACKLASH
+    if (!config_backlash_get_auto_on()) {
+        backlash_sync_axis(AXIS_X, BACKLASH_REF_DIR_X);
+        backlash_sync_axis(AXIS_Z, BACKLASH_REF_DIR_Z);
+    }
+#endif
 }
 
 float motion_get_pos_x(void) {

@@ -39,6 +39,7 @@ void dds_set_position(uint8_t axis, int32_t pos);
 void dds_set_target(uint8_t axis, int32_t target);
 int32_t dds_get_target(uint8_t axis);
 uint8_t dds_at_target(uint8_t axis);
+uint8_t dds_get_direction(uint8_t axis);
 void dds_reset_accumulator(void);
 
 #ifdef __cplusplus
