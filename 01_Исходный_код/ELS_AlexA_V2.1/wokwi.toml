@@ -2,5 +2,5 @@
 version = 1
 firmware = "build/ELS_AlexA_V2.1.ino.hex"
 elf = "build/ELS_AlexA_V2.1.ino.elf"
+gdbServerPort = 3333                 # Порт для подключения отладчика
 
-# diagram.json в папке скетча подхватывается автоматически

@@ -3,23 +3,25 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
+/* EEPROM machine block: magic@32, data@33, sum@55 */
 #define EEPROM_MACHINE_MAGIC 0xC5
 #define EEPROM_MACHINE_ADDR_MAGIC 32
 #define EEPROM_MACHINE_ADDR_DATA 33
 #define EEPROM_MACHINE_ADDR_SUM 55
 
+/* Сырые параметры одной оси в EEPROM */
 typedef struct {
-    uint16_t motor_steps;
-    uint8_t microstep;
-    uint16_t screw_pitch;
-    uint16_t max_speed;
-    uint16_t rapid_speed;
-    uint8_t feed_accel;
-    uint8_t dir_invert;
+    uint16_t motor_steps;   /* полных шагов двигателя */
+    uint8_t microstep;      /* делитель */
+    uint16_t screw_pitch;   /* шаг ВПК, ×100 мм */
+    uint16_t max_speed;     /* мм/мин */
+    uint16_t rapid_speed;   /* мм/мин */
+    uint8_t feed_accel;     /* уровень ускорения */
+    uint8_t dir_invert;     /* 0/1 */
 } AxisCfgRaw_t;
 
 typedef struct {
-    AxisCfgRaw_t ax[2];
+    AxisCfgRaw_t ax[2];     /* X, Z */
     uint16_t spindle_ppr;
     uint16_t jog_decel_steps;
 } MachineCfg_t;
@@ -37,7 +39,7 @@ static const MachineCfg_t machine_defaults = {
     JOG_DECEL_STEPS_DEFAULT
 };
 
-static AxisCfgRaw_t *axis_cfg(uint8_t axis) {
+static AxisCfgRaw_t *axis_cfg(uint8_t axis) {  /* указатель на ax[X|Z] */
     if (axis > AXIS_Z) axis = AXIS_Z;
     return &machine_cfg.ax[axis];
 }
@@ -155,7 +157,7 @@ uint16_t config_get_jog_decel_steps(void) {
     return machine_cfg.jog_decel_steps;
 }
 
-uint32_t config_mm_min_to_sps(uint8_t axis, float mm_min) {
+uint32_t config_mm_min_to_sps(uint8_t axis, float mm_min) {  /* мм/мин → steps/s */
     if (mm_min < 1.0f) mm_min = 1.0f;
     float spm = config_get_steps_per_mm(axis);
     uint32_t sps = (uint32_t)((mm_min * spm) / 60.0f);

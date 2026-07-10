@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
+/* Глобальный блок EEPROM: magic, feed_max%, buzzer, checksum */
 #define EEPROM_ADDR_MAGIC 0
 #define EEPROM_ADDR_FEED 1
 #define EEPROM_ADDR_BUZZER 2
@@ -44,7 +45,7 @@ static void config_write_eeprom(void) {
     EEPROM.update(EEPROM_ADDR_CHECKSUM, sum);
 }
 
-void config_load(void) {
+void config_load(void) {  /* блок 0..3 + feed + machine + backlash + display */
     uint8_t magic, feed, buzzer, checksum;
     config_read_raw(&magic, &feed, &buzzer, &checksum);
 

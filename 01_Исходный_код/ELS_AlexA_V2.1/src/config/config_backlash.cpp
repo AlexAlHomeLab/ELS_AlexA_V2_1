@@ -10,11 +10,11 @@
 #define EEPROM_BACKLASH_ADDR_SUM 64
 
 typedef struct __attribute__((packed)) {
-    uint8_t auto_on;
-    uint16_t steps_x;
+    uint8_t auto_on;      /* автовыборка при старте */
+    uint16_t steps_x;     /* шаги выборки X; 0 → CENTIMM */
     uint16_t steps_z;
-    uint8_t auto_speed;
-    uint8_t min_speed;
+    uint8_t auto_speed;   /* мм/мин */
+    uint8_t min_speed;    /* мм/мин */
 } BacklashCfg_t;
 
 static BacklashCfg_t bl_cfg;
@@ -164,6 +164,7 @@ void config_backlash_set_min_speed(uint16_t mm_min) {
 }
 
 float config_backlash_comp_speed_mm_min(uint8_t axis, float feed_mm_min) {
+    /* clamp к [min_speed, auto_speed] и max_speed оси */
     float min_s = (float)bl_cfg.min_speed;
     float max_s = (float)bl_cfg.auto_speed;
     float cap = (float)config_get_max_speed_mm_min(axis);

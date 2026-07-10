@@ -11,13 +11,14 @@
 #include <string.h>
 #include <stddef.h>
 
+/* Кольцевой буфер сегментов */
 static PlannerBlock_t block_buffer[BLOCK_BUFFER_SIZE];
-static uint8_t block_head = 0;
-static uint8_t block_tail = 0;
-static uint8_t block_exec = 0;
-static uint8_t startup_pending = 0;
+static uint8_t block_head = 0;   /* индекс записи */
+static uint8_t block_tail = 0;   /* индекс исполнения */
+static uint8_t block_exec = 0;   /* 1 — сегмент передан в dds */
+static uint8_t startup_pending = 0;  /* ждём завершения автовыборки люфта */
 
-#define ACCEL_MM_S2_SCALE 50.0f
+#define ACCEL_MM_S2_SCALE 50.0f  /* feed_accel → мм/с² */
 
 static uint8_t prev_index(uint8_t idx) {
     return (uint8_t)((idx + BLOCK_BUFFER_SIZE - 1U) % BLOCK_BUFFER_SIZE);
@@ -27,6 +28,7 @@ static uint8_t next_index(uint8_t idx) {
     return (uint8_t)((idx + 1U) % BLOCK_BUFFER_SIZE);
 }
 
+/* Ограничить скорость config max_speed оси */
 static float cap_speed_mm_min(uint8_t axis, float mm_min) {
     float cap = (float)config_get_max_speed_mm_min(axis);
     if (mm_min < 1.0f) mm_min = 1.0f;
@@ -38,6 +40,7 @@ static float axis_accel_mm_s2(uint8_t axis) {
     return (float)config_get_feed_accel(axis) * ACCEL_MM_S2_SCALE;
 }
 
+/* Макс. entry_speed при заданном exit и длине сегмента: v = sqrt(v_exit² + 2·a·s) */
 static float speed_from_dist(float v_exit_mm_min, float dist_steps, uint8_t axis) {
     float spm = config_get_steps_per_mm(axis);
     float accel = axis_accel_mm_s2(axis);
@@ -48,11 +51,12 @@ static float speed_from_dist(float v_exit_mm_min, float dist_steps, uint8_t axis
     return sqrtf(v2) * 60.0f;
 }
 
-static int32_t planner_mm_to_steps(uint8_t axis, float mm) {
+static int32_t planner_mm_to_steps(uint8_t axis, float mm) {  /* мм → шаги */
     float spm = config_get_steps_per_mm(axis);
     return (int32_t)(mm * spm + (mm >= 0.0f ? 0.5f : -0.5f));
 }
 
+/* distance, direction_*, bl_axis от текущей позиции до цели блока */
 static void planner_fill_geometry_segment(PlannerBlock_t *b, int32_t cx, int32_t cz) {
     if (b->flags & PLANNER_FLAG_BACKLASH) {
         b->distance = (float)b->bl_steps;
@@ -76,6 +80,7 @@ static void planner_fill_geometry_segment(PlannerBlock_t *b, int32_t cx, int32_t
     b->bl_axis = (ux >= uz) ? AXIS_X : AXIS_Z;
 }
 
+/* Блок → MotionCommand_t → dds_motion_start */
 static void planner_start_block(PlannerBlock_t *b) {
     MotionCommand_t cmd;
     uint8_t master;
@@ -119,6 +124,7 @@ static void planner_start_block(PlannerBlock_t *b) {
     block_exec = 1;
 }
 
+/* После сегмента: sync люфта для backlash-блока */
 static void planner_finish_block(PlannerBlock_t *b) {
     if (b->flags & PLANNER_FLAG_BACKLASH) {
         uint8_t ref = (b->bl_axis == AXIS_X) ? BACKLASH_REF_DIR_X : BACKLASH_REF_DIR_Z;
@@ -146,6 +152,7 @@ static void planner_block_set_target(PlannerBlock_t *b, int32_t tx, int32_t tz) 
     b->target_z = (float)b->target_steps_z / STEPS_PER_MM_Z;
 }
 
+/* Добавить блок в head; -1 переполнение, -2 нулевая длина */
 static int planner_push_block(int32_t tx, int32_t tz, float speed, uint8_t flags,
                               uint8_t bl_axis, uint16_t bl_steps) {
     uint8_t next = (uint8_t)((block_head + 1U) % BLOCK_BUFFER_SIZE);
@@ -257,7 +264,9 @@ uint8_t planner_startup_busy(void) {
     return 0;
 }
 
-void planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *kind, uint8_t cruise) {
+void planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *kind, uint8_t cruise,
+                      uint8_t lim_hit, uint8_t lim_cmp, int32_t lim_cmp_stp) {
+    /* retarget если jog активен; иначе stop + start; cruise = MOTION_FLAG_JOG_CRUISE */
     MotionCommand_t cmd;
     float entry = 0.0f;
     uint8_t extended;
@@ -283,7 +292,7 @@ void planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *ki
 
     extended = dds_motion_jog_retarget(&cmd);
     if (extended) {
-        DBG_JOG_MOVE(kind, tx, tz, speed_mm_min, 1);
+        DBG_JOG_MOVE_LIM(kind, tx, tz, speed_mm_min, 1, lim_hit, lim_cmp, lim_cmp_stp);
         block_exec = 1;
         return;
     }
@@ -305,14 +314,20 @@ void planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *ki
     cmd.entry_mm_min = cap_speed_mm_min(master, entry);
     dds_motion_start(&cmd);
     block_exec = 1;
-    DBG_JOG_MOVE(kind, tx, tz, speed_mm_min, 0);
+    DBG_JOG_MOVE_LIM(kind, tx, tz, speed_mm_min, 0, lim_hit, lim_cmp, lim_cmp_stp);
 }
 
 void planner_jog_stop(void) {
-    if (!dds_motion_busy()) return;
-    dds_motion_jog_release();
-    if (!dds_motion_busy()) block_exec = 0;
-    DBG_INFO("MOT", "JOG", "stop");
+    uint8_t was_busy = dds_motion_busy();
+    if (was_busy) {
+        dds_motion_jog_release();
+        block_exec = 0;
+    }
+    dds_set_target(AXIS_X, dds_get_position(AXIS_X));
+    dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
+    if (was_busy) {
+        DBG_JOG_STOP(dds_get_position(AXIS_X), dds_get_position(AXIS_Z));
+    }
 }
 
 void planner_exec_axis(uint8_t axis, int32_t target_steps, float speed_mm_min, uint8_t jog) {
@@ -328,7 +343,7 @@ void planner_exec_axis(uint8_t axis, int32_t target_steps, float speed_mm_min, u
     }
 
     if (jog) {
-        planner_exec_jog(tx, tz, speed_mm_min, "JOG", 0);
+        planner_exec_jog(tx, tz, speed_mm_min, "JOG", 0, 0U, 0U, 0L);
         return;
     }
 
@@ -353,7 +368,7 @@ void planner_exec_axis(uint8_t axis, int32_t target_steps, float speed_mm_min, u
     }
 }
 
-void planner_calculate_junctions(void) {
+void planner_calculate_junctions(void) {  /* GRBL-style: entry_speed от exit следующего */
     if (block_tail == block_head) return;
 
     uint8_t idx = block_tail;
@@ -401,8 +416,9 @@ void planner_calculate_junctions(void) {
     }
 }
 
-void planner_process(void) {
+void planner_process(void) {  /* main: лог DDS, завершение блока, старт следующего */
     dds_motion_log_poll();
+    backlash_log_poll();
 
     if (block_exec) {
         if (!dds_motion_busy()) {

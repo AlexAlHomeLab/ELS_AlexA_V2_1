@@ -1,13 +1,15 @@
 #ifndef CONFIG_DEFS_H
 #define CONFIG_DEFS_H
 
+/* Общие константы проекта: оси, FSM, планировщик, люфт, координаты. */
+
 #include <stdint.h>
 
 /* --- Оси --- */
 #define AXIS_X 0
 #define AXIS_Z 1
 
-/* --- Подрежимы --- */
+/* --- Подрежимы (Manual / External / Internal цикл) --- */
 #define SUB_MANUAL 0
 #define SUB_EXT    1
 #define SUB_INT    2
@@ -20,15 +22,15 @@
 #define AXIS_Z_DIR_INVERT_DEFAULT 0
 #endif
 
-/* --- FSM --- */
+/* --- FSM: коды ошибок и тип цикла --- */
 #define ERR_INVALID_TRANSITION 1
 #define ERR_LIMIT              2
 
-#define CYCLE_EXT 0
-#define CYCLE_INT 1
+#define CYCLE_EXT 0   /* внешний цикл */
+#define CYCLE_INT 1   /* внутренний цикл */
 
 /* --- Планировщик --- */
-#define BLOCK_BUFFER_SIZE 16
+#define BLOCK_BUFFER_SIZE 16  /* глубина очереди сегментов */
 
 #if defined(__AVR__)
 #include <util/atomic.h>

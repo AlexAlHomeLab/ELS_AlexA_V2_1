@@ -18,7 +18,11 @@ void debug_log_event(uint8_t level, const char *module, const char *component, c
 void debug_log_event_val(uint8_t level, const char *module, const char *component, const char *msg, uint32_t val);
 void debug_log_event_val_i32(uint8_t level, const char *module, const char *component, const char *msg, int32_t val);
 void debug_log_jog(int32_t steps, uint8_t axis, int32_t coord_steps);
-void debug_log_jog_move(const char *kind, int32_t tx, int32_t tz, float spd, uint8_t extend);
+void debug_log_jog_move(const char *kind, int32_t tx, int32_t tz, float spd, uint8_t extend,
+                        uint8_t lim_hit, uint8_t lim_cmp, int32_t lim_cmp_stp);
+void debug_log_jog_stop(int32_t tx, int32_t tz);
+void debug_log_mpg_pulse(uint8_t axis, int32_t pos);
+void debug_log_limit_cmp(uint8_t axis, int32_t dist_stp);
 void debug_log_planner_add(uint8_t backlash, uint8_t axis, uint32_t dst_steps,
                            float x_mm, float z_mm, float speed_mm_min,
                            float entry_mm_min, float exit_mm_min, uint8_t queue_len);
@@ -37,7 +41,13 @@ void debug_log_planner_decel(uint8_t axis, uint32_t step_ev, uint32_t rate_sps,
 #define DBG_VERBOSE_VAL(mod, comp, msg, v) debug_log_event_val(DEBUG_LEVEL_VERBOSE, mod, comp, msg, v)
 #define DBG_VERBOSE_VAL_I32(mod, comp, msg, v) debug_log_event_val_i32(DEBUG_LEVEL_VERBOSE, mod, comp, msg, v)
 #define DBG_JOG(steps, axis, coord) debug_log_jog(steps, axis, coord)
-#define DBG_JOG_MOVE(kind, tx, tz, spd, ext) debug_log_jog_move(kind, tx, tz, spd, ext)
+#define DBG_JOG_MOVE(kind, tx, tz, spd, ext) \
+    debug_log_jog_move(kind, tx, tz, spd, ext, 0U, 0U, 0L)
+#define DBG_JOG_MOVE_LIM(kind, tx, tz, spd, ext, hit, cmp, stp) \
+    debug_log_jog_move(kind, tx, tz, spd, ext, hit, cmp, stp)
+#define DBG_JOG_STOP(tx, tz) debug_log_jog_stop(tx, tz)
+#define DBG_MPG_PULSE(axis, pos) debug_log_mpg_pulse(axis, pos)
+#define DBG_LIM_CMP(axis, stp) debug_log_limit_cmp(axis, stp)
 #define DBG_PLN_ADD(bl, ax, dst, x, z, spd, ein, eout, q) \
     debug_log_planner_add(bl, ax, dst, x, z, spd, ein, eout, q)
 #define DBG_BL(evt, axis, dir, val) debug_log_backlash(evt, axis, dir, val)
@@ -52,6 +62,10 @@ void debug_log_planner_decel(uint8_t axis, uint32_t step_ev, uint32_t rate_sps,
 #define DBG_INFO_VAL_I32(mod, comp, msg, v) ((void)0)
 #define DBG_JOG(steps, axis, coord) ((void)0)
 #define DBG_JOG_MOVE(kind, tx, tz, spd, ext) ((void)0)
+#define DBG_JOG_MOVE_LIM(kind, tx, tz, spd, ext, hit, cmp, stp) ((void)0)
+#define DBG_JOG_STOP(tx, tz) ((void)0)
+#define DBG_MPG_PULSE(axis, pos) ((void)0)
+#define DBG_LIM_CMP(axis, stp) ((void)0)
 #define DBG_PLN_ADD(bl, ax, dst, x, z, spd, ein, eout, q) ((void)0)
 #define DBG_VERBOSE(mod, comp, msg) ((void)0)
 #define DBG_VERBOSE_VAL(mod, comp, msg, v) ((void)0)

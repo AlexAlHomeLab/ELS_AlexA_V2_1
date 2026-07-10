@@ -6,10 +6,10 @@
 #define EEPROM_DISPLAY_MAGIC      0xD1
 #define EEPROM_DISPLAY_ADDR       70
 #define EEPROM_DISPLAY_ADDR_SUM   72
-#define EEPROM_DISPLAY_ADDR_OLD   64
+#define EEPROM_DISPLAY_ADDR_OLD   64   /* миграция со старого адреса */
 #define EEPROM_DISPLAY_ADDR_SUM_OLD 66
 
-static uint8_t coord_units = COORD_UNIT_DEFAULT;
+static uint8_t coord_units = COORD_UNIT_DEFAULT;  /* COORD_UNIT_* */
 
 static uint8_t display_cfg_checksum(uint8_t units) {
     return (uint8_t)(EEPROM_DISPLAY_MAGIC + units);
@@ -69,7 +69,7 @@ void config_set_coord_units(uint8_t units) {
     coord_units = units;
 }
 
-char config_coord_unit_flag(void) {
+char config_coord_unit_flag(void) {  /* символ единицы на LCD */
     switch (coord_units) {
     case COORD_UNIT_MM: return 'M';
     case COORD_UNIT_INCH: return 'D';

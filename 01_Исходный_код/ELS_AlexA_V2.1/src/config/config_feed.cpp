@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
+/* EEPROM feed block: magic@16, ranges@17, sum@25 */
 #define EEPROM_FEED_MAGIC 0xB7
 #define EEPROM_FEED_ADDR_MAGIC 16
 #define EEPROM_FEED_ADDR_RANGES 17
@@ -20,7 +21,7 @@ static const FeedRangeRaw_t feed_defaults[CONFIG_FEED_RANGE_COUNT] = {
     {CONFIG_FEED_SYNC_MIN_DEFAULT, CONFIG_FEED_SYNC_MAX_DEFAULT},
 };
 
-/* Async: все режимы кроме Sync и Thread */
+/* Async: все режимы кроме Sync и Thread; 0xFF — пот не используется */
 static const uint8_t mode_feed_range[CONFIG_FEED_MODE_COUNT] = {
     FEED_RANGE_ASYNC,  /* Async */
     FEED_RANGE_SYNC,   /* Sync */
@@ -66,6 +67,7 @@ static void feed_cfg_write_eeprom(void) {
 }
 
 static uint16_t map_inverted_discrete(uint16_t min_raw, uint16_t max_raw, uint16_t adc) {
+    /* пот инвертирован: max при ADC=0 */
     if (max_raw <= min_raw) return min_raw;
     return (uint16_t)(max_raw - (uint32_t)(max_raw - min_raw + 1) * adc / 1024U);
 }
@@ -156,7 +158,7 @@ float config_feed_get_max(uint8_t mode) {
     return raw_to_value(id, feed_ranges[id].max_raw);
 }
 
-float config_feed_map_adc(uint8_t mode, uint16_t adc) {
+float config_feed_map_adc(uint8_t mode, uint16_t adc) {  /* ADC 0..1023 → подача */
     if (!config_feed_uses_pot(mode)) return 0.0f;
 
     FeedRangeId_t id = mode_to_range(mode);

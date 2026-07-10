@@ -4,13 +4,6 @@
 #include "planner.h"
 #include "../../config/config.h"
 
-static int32_t motion_cur_steps(uint8_t axis) {
-    if (dds_at_target(axis)) {
-        return dds_get_position(axis);
-    }
-    return dds_get_target(axis);
-}
-
 void motion_init(void) {
     dds_init();
     backlash_init();
@@ -39,7 +32,7 @@ uint8_t motion_is_moving(void) {
 
 int32_t motion_get_pos_steps(uint8_t axis) {
     if (axis > AXIS_Z) return 0;
-    return motion_cur_steps(axis);
+    return dds_get_position(axis);
 }
 
 float motion_get_pos_mm(uint8_t axis) {

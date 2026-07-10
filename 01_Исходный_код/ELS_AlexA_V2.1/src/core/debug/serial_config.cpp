@@ -306,7 +306,7 @@ static void cmd_help(void) {
     Serial.println(F("$20-$25 X motor/ustep/pitch/max/rapid/accel"));
     Serial.println(F("$26 X steps/mm, $27 X dir invert"));
     Serial.println(F("$30 spindle PPR, $31 buzzer"));
-    Serial.println(F("$32 jog decel steps (0=off)"));
+    Serial.println(F("$32 jog decel min steps (0=off)"));
     Serial.println(F("$40 backlash auto, $41-$42 X/Z steps"));
     Serial.println(F("$43 backlash max speed mm/min"));
     Serial.println(F("$45 backlash min speed mm/min"));

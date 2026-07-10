@@ -8,37 +8,40 @@
 #include <avr/interrupt.h>
 #include <string.h>
 
+/* Состояние осей X и Z */
 static AxisState_t axis_x;
 static AxisState_t axis_z;
 
+/* Профиль трапецеидального разгона/торможения (master-ось задаёт темп) */
 typedef struct {
-    uint8_t active;
-    uint8_t flags;
-    uint8_t jog_cruise;
-    uint8_t master_axis;
-    uint32_t step_count;
-    uint32_t step_events;
-    uint32_t accelerate_until;
-    uint32_t decelerate_after;
-    uint32_t current_rate;
-    uint32_t nominal_rate;
-    uint32_t initial_rate;
-    uint32_t final_rate;
-    uint32_t acceleration;
-    uint32_t axis_steps[2];
+    uint8_t active;              /* 1 — движение выполняется */
+    uint8_t flags;               /* копия MotionCommand_t.flags */
+    uint8_t jog_cruise;          /* 1 — jog без финального стопа */
+    uint8_t master_axis;         /* ось, по шагам которой считается профиль */
+    uint32_t step_count;         /* всего step_events до завершения */
+    uint32_t step_events;        /* счётчик шагов master-оси */
+    uint32_t accelerate_until;   /* step_events до конца разгона */
+    uint32_t decelerate_after;   /* step_events после начала торможения */
+    uint32_t current_rate;       /* текущая скорость профиля, steps/s */
+    uint32_t nominal_rate;       /* крейсерская скорость, steps/s */
+    uint32_t initial_rate;       /* скорость старта, steps/s */
+    uint32_t final_rate;         /* скорость финиша, steps/s */
+    uint32_t acceleration;       /* ускорение, steps/s² */
+    uint32_t axis_steps[2];      /* длина сегмента по X и Z, шаги */
 } MotionProfile_t;
 
 static MotionProfile_t motion_prof;
 
+/* Кольцевая очередь отладочного лога (ISR → main) */
 #define MOTION_LOG_QSIZE 6U
-#define MOTION_LOG_CRUISE 1U
-#define MOTION_LOG_DECEL  2U
-#define MOTION_LOG_DIR    3U
+#define MOTION_LOG_CRUISE 1U   /* вход в крейсер */
+#define MOTION_LOG_DECEL  2U   /* начало торможения */
+#define MOTION_LOG_DIR    3U   /* смена направления */
 
 typedef struct {
-    uint8_t type;
+    uint8_t type;       /* MOTION_LOG_* */
     uint8_t axis;
-    int8_t dir;
+    int8_t dir;         /* +1 / -1 */
     uint8_t pad;
     uint32_t step_ev;
     uint32_t rate;
@@ -49,17 +52,20 @@ typedef struct {
     int32_t tgt;
 } MotionLogItem_t;
 
-static volatile uint8_t mlog_w;
-static volatile uint8_t mlog_r;
+static volatile uint8_t mlog_w;  /* индекс записи (ISR) */
+static volatile uint8_t mlog_r;  /* индекс чтения (main) */
 static MotionLogItem_t mlog_q[MOTION_LOG_QSIZE];
 
+/* feed_accel × scale → мм/с² */
 #define ACCEL_MM_S2_SCALE 50.0f
 
+/* steps/sec → DDS-приращение: (sps << 31) / STEP_ISR_FREQ_HZ */
 uint32_t dds_calc_increment(uint32_t steps_per_sec) {
     if (steps_per_sec < 1U) steps_per_sec = 1U;
     return (uint32_t)(((uint64_t)steps_per_sec << 31) / STEP_ISR_FREQ_HZ);
 }
 
+/* Целочисленный квадратный корень (для расчёта пиковой скорости короткого сегмента) */
 static uint32_t isqrt32(uint32_t x) {
     uint32_t op = x;
     uint32_t res = 0;
@@ -80,12 +86,14 @@ static uint32_t isqrt32(uint32_t x) {
     return res;
 }
 
+/* мм/мин → steps/s с нижним порогом 1 sps */
 static uint32_t mm_min_to_sps(uint8_t axis, float mm_min) {
     if (mm_min < 0.25f) return 1U;
     if (mm_min < 1.0f) mm_min = 1.0f;
     return config_mm_min_to_sps(axis, mm_min);
 }
 
+/* Ускорение оси из config feed_accel, steps/s² */
 static uint32_t axis_accel_steps_s2(uint8_t axis) {
     uint8_t fa = config_get_feed_accel(axis);
     float accel_mm_s2 = (float)fa * ACCEL_MM_S2_SCALE;
@@ -95,12 +103,14 @@ static uint32_t axis_accel_steps_s2(uint8_t axis) {
     return a;
 }
 
+/* Дистанция разгона/торможения: (v_hi² - v_lo²) / (2·a) в шагах master-оси */
 static uint32_t accel_distance(uint32_t rate_hi, uint32_t rate_lo, uint32_t accel) {
     if (accel == 0U || rate_hi <= rate_lo) return 0U;
     uint64_t diff = (uint64_t)rate_hi * (uint64_t)rate_hi - (uint64_t)rate_lo * (uint64_t)rate_lo;
     return (uint32_t)(diff / ((uint64_t)accel * 2ULL));
 }
 
+/* Знаменатель для пропорции скоростей X/Z (max оси или step_count) */
 static uint32_t motion_profile_denom(void) {
     MotionProfile_t *p = &motion_prof;
 
@@ -114,6 +124,7 @@ static uint32_t motion_profile_denom(void) {
 
 static void motion_update_dirs(int32_t dx, int32_t dz);
 
+/* Фаза профиля: 0 разгон, 1 крейсер, 2 торможение, 0xFF неактивен */
 static uint8_t motion_profile_phase(const MotionProfile_t *p) {
     if (!p->active) return 0xFFU;
     if (p->jog_cruise && p->decelerate_after >= 0xFFFFFF00UL) {
@@ -125,7 +136,7 @@ static uint8_t motion_profile_phase(const MotionProfile_t *p) {
     return 1U;
 }
 
-static void mlog_reset(void) {
+static void mlog_reset(void) {  /* очистка очереди лога */
     uint8_t sreg = SREG;
     cli();
     mlog_w = 0U;
@@ -133,7 +144,7 @@ static void mlog_reset(void) {
     SREG = sreg;
 }
 
-static void mlog_push_isr(const MotionLogItem_t *item) {
+static void mlog_push_isr(const MotionLogItem_t *item) {  /* запись из ISR */
     uint8_t sreg = SREG;
     uint8_t next;
 
@@ -189,7 +200,7 @@ static void mlog_push_decel(const MotionProfile_t *p) {
     mlog_push_isr(&item);
 }
 
-void dds_motion_log_poll(void) {
+void dds_motion_log_poll(void) {  /* main: вывод записей лога в DBG */
     while (mlog_r != mlog_w) {
         MotionLogItem_t item;
         uint8_t sreg = SREG;
@@ -220,6 +231,7 @@ void dds_motion_log_poll(void) {
     }
 }
 
+/* Ограничить step_increment при активной выборке люфта */
 static void motion_boost_backlash_rates(void) {
     uint8_t axis;
     AxisState_t *axes[2] = {&axis_x, &axis_z};
@@ -243,6 +255,7 @@ static void motion_boost_backlash_rates(void) {
     }
 }
 
+/* Распределить current_rate по осям пропорционально axis_steps */
 static void motion_apply_rates(void) {
     MotionProfile_t *p = &motion_prof;
     uint32_t r = p->current_rate;
@@ -268,6 +281,7 @@ static void motion_apply_rates(void) {
     motion_boost_backlash_rates();
 }
 
+/* Расчёт точек разгона/торможения и стартовых rate обеих осей */
 static void motion_prep_profile(uint32_t steps, uint32_t nominal, uint32_t initial,
                                 uint32_t final, uint32_t accel) {
     MotionProfile_t *p = &motion_prof;
@@ -308,6 +322,7 @@ static void motion_prep_profile(uint32_t steps, uint32_t nominal, uint32_t initi
     motion_apply_rates();
 }
 
+/* Один шаг master-оси: обновление current_rate и лог фаз */
 static void motion_profile_step(uint8_t axis) {
     MotionProfile_t *p = &motion_prof;
     uint8_t phase_before;
@@ -320,6 +335,7 @@ static void motion_profile_step(uint8_t axis) {
     phase_before = motion_profile_phase(p);
 
     p->step_events++;
+
     if (p->step_events <= p->accelerate_until) {
         uint32_t inc = (p->acceleration << 14) / p->current_rate;
         if (inc < 1U) inc = 1U;
@@ -347,6 +363,7 @@ static void motion_profile_step(uint8_t axis) {
     }
 }
 
+/* 1 если профиль завершён (не jog_cruise, цели и люфт достигнуты) */
 static uint8_t motion_profile_done(void) {
     MotionProfile_t *p = &motion_prof;
 
@@ -358,19 +375,19 @@ static uint8_t motion_profile_done(void) {
     return 1U;
 }
 
-void dds_init(void) {
+void dds_init(void) {  /* сброс осей, профиля, очереди лога */
     memset(&axis_x, 0, sizeof(AxisState_t));
     memset(&axis_z, 0, sizeof(AxisState_t));
     memset(&motion_prof, 0, sizeof(MotionProfile_t));
     mlog_reset();
 }
 
-static void dir_x_set(uint8_t d) {
+static void dir_x_set(uint8_t d) {  /* DIR X с учётом инверсии */
     if (config_get_dir_invert(AXIS_X)) d = !d;
     DIR_X_SET(d);
 }
 
-static void dir_z_set(uint8_t d) {
+static void dir_z_set(uint8_t d) {  /* DIR Z с учётом инверсии */
     if (config_get_dir_invert(AXIS_Z)) d = !d;
     DIR_Z_SET(d);
 }
@@ -400,6 +417,7 @@ static void step_x_off(void) { STEP_X_OFF(); }
 static void step_z_on(void) { STEP_Z_ON(); }
 static void step_z_off(void) { STEP_Z_OFF(); }
 
+/* DDS-шаг одной оси: направление, люфт, импульс STEP, шаг профиля */
 static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), void (*step_off)(void),
                           void (*dir_set)(uint8_t)) {
     uint8_t fwd;
@@ -453,7 +471,7 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
     }
 }
 
-void stepper_generate_steps(void) {
+void stepper_generate_steps(void) {  /* ISR: шаг X, шаг Z, завершение профиля */
     dds_axis_step(AXIS_X, &axis_x, step_x_on, step_x_off, dir_x_set);
     dds_axis_step(AXIS_Z, &axis_z, step_z_on, step_z_off, dir_z_set);
 
@@ -499,7 +517,7 @@ void dds_reset_accumulator(void) {
     axis_z.accumulator = 0U;
 }
 
-void dds_motion_start(const MotionCommand_t *cmd) {
+void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / сегмент */
     if (!cmd) return;
 
     int32_t cx = dds_get_position(AXIS_X);
@@ -656,6 +674,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {
     }
 }
 
+/* Установить DIR и arm люфта при смене знака смещения (jog retarget) */
 static void motion_update_dirs(int32_t dx, int32_t dz) {
     if (dx != 0) {
         uint8_t nd = (dx > 0) ? 1U : 0U;
@@ -675,6 +694,7 @@ static void motion_update_dirs(int32_t dx, int32_t dz) {
     }
 }
 
+/* Продлить профиль jog при новой цели (пересчёт decelerate_after) */
 static void motion_profile_extend(uint32_t remain_um, uint32_t ux, uint32_t uz) {
     MotionProfile_t *p = &motion_prof;
     uint32_t done = p->step_events;
@@ -697,7 +717,7 @@ static void motion_profile_extend(uint32_t remain_um, uint32_t ux, uint32_t uz) 
     motion_apply_rates();
 }
 
-uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {
+uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена цели jog на лету */
     int32_t cx;
     int32_t cz;
     int32_t dx;
@@ -788,116 +808,7 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {
 }
 
 void dds_motion_jog_release(void) {
-    MotionProfile_t *p = &motion_prof;
-    uint32_t seg;
-    uint32_t decel_x;
-    uint32_t decel_z;
-    uint32_t am;
-    uint32_t v_i;
-    uint32_t v_f;
-    uint32_t a_eff;
-    int32_t cx;
-    int32_t cz;
-    int32_t sx;
-    int32_t sz;
-    int32_t new_tx;
-    int32_t new_tz;
-
-    if (!p->active || !p->jog_cruise) {
-        dds_motion_stop();
-        return;
-    }
-
-    seg = (uint32_t)config_get_jog_decel_steps();
-    if (seg == 0U) {
-        dds_motion_stop();
-        return;
-    }
-
-    v_i = p->current_rate;
-    if (v_i < 2U) {
-        dds_motion_stop();
-        return;
-    }
-
-    cx = dds_get_position(AXIS_X);
-    cz = dds_get_position(AXIS_Z);
-    p->jog_cruise = 0U;
-
-    decel_x = 0U;
-    decel_z = 0U;
-    sx = 0;
-    sz = 0;
-
-    if (axis_x.enabled && !axis_z.enabled) {
-        sx = axis_x.direction ? 1 : -1;
-        decel_x = seg;
-    } else if (axis_z.enabled && !axis_x.enabled) {
-        sz = axis_z.direction ? 1 : -1;
-        decel_z = seg;
-    } else if (axis_x.enabled && axis_z.enabled) {
-        uint32_t rx = (uint32_t)((dds_get_target(AXIS_X) > cx) ?
-                                 (dds_get_target(AXIS_X) - cx) : (cx - dds_get_target(AXIS_X)));
-        uint32_t rz = (uint32_t)((dds_get_target(AXIS_Z) > cz) ?
-                                 (dds_get_target(AXIS_Z) - cz) : (cz - dds_get_target(AXIS_Z)));
-        am = rx > rz ? rx : rz;
-        if (am < 1U) am = 1U;
-        if (rx > 0U) {
-            decel_x = (uint32_t)(((uint64_t)seg * rx) / am);
-            if (decel_x < 1U) decel_x = 1U;
-            sx = (dds_get_target(AXIS_X) >= cx) ? 1 : -1;
-        }
-        if (rz > 0U) {
-            decel_z = (uint32_t)(((uint64_t)seg * rz) / am);
-            if (decel_z < 1U) decel_z = 1U;
-            sz = (dds_get_target(AXIS_Z) >= cz) ? 1 : -1;
-        }
-    } else {
-        dds_motion_stop();
-        return;
-    }
-
-    new_tx = cx + sx * (int32_t)decel_x;
-    new_tz = cz + sz * (int32_t)decel_z;
-    new_tx = limits_clamp_steps(AXIS_X, new_tx);
-    new_tz = limits_clamp_steps(AXIS_Z, new_tz);
-
-    p->axis_steps[AXIS_X] = (uint32_t)((new_tx > cx) ? (new_tx - cx) : (cx - new_tx));
-    p->axis_steps[AXIS_Z] = (uint32_t)((new_tz > cz) ? (new_tz - cz) : (cz - new_tz));
-    am = p->axis_steps[AXIS_X] > p->axis_steps[AXIS_Z] ?
-         p->axis_steps[AXIS_X] : p->axis_steps[AXIS_Z];
-    if (am < 1U) {
-        dds_motion_stop();
-        return;
-    }
-
-    p->master_axis = (p->axis_steps[AXIS_X] >= p->axis_steps[AXIS_Z]) ? AXIS_X : AXIS_Z;
-    dds_set_target(AXIS_X, new_tx);
-    dds_set_target(AXIS_Z, new_tz);
-
-    if (p->axis_steps[AXIS_X] > 0U) {
-        dds_enable(AXIS_X, 1U);
-    } else {
-        axis_x.enabled = 0U;
-        axis_x.step_increment = 0U;
-    }
-    if (p->axis_steps[AXIS_Z] > 0U) {
-        dds_enable(AXIS_Z, 1U);
-    } else {
-        axis_z.enabled = 0U;
-        axis_z.step_increment = 0U;
-    }
-
-    v_f = 1U;
-    {
-        uint64_t diff = (uint64_t)v_i * (uint64_t)v_i - (uint64_t)v_f * (uint64_t)v_f;
-        a_eff = (uint32_t)(diff / ((uint64_t)am * 2ULL));
-        if (a_eff < 1U) a_eff = 1U;
-    }
-
-    p->active = 1U;
-    motion_prep_profile(am, v_i, v_i, v_f, a_eff);
-    mlog_push_decel(p);
+    dds_motion_stop();
 }
 
 void dds_motion_update_target(uint8_t axis, int32_t target) {
@@ -928,7 +839,7 @@ uint8_t dds_motion_busy(void) {
     return motion_prof.active;
 }
 
-void dds_motion_stop(void) {
+void dds_motion_stop(void) {  /* сброс профиля и отключение шагов */
     motion_prof.active = 0U;
     motion_prof.jog_cruise = 0U;
     axis_x.enabled = 0U;

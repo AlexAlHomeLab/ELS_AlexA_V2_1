@@ -8,17 +8,17 @@
 #include "../../config/config_storage.h"
 #include <Arduino.h>
 
-#define LIMIT_OFF_MIN (-2000000L)
-#define LIMIT_OFF_MAX  2000000L
+#define LIMIT_OFF_MIN (-2000000L)  /* лимит не задан — мин. граница */
+#define LIMIT_OFF_MAX  2000000L   /* лимит не задан — макс. граница */
 
 static const uint8_t limit_led_pins[4] = {
     LED_LIMIT_LEFT_PIN, LED_LIMIT_FRONT_PIN, LED_LIMIT_RIGHT_PIN, LED_LIMIT_REAR_PIN
 };
 static const char *limit_names[4] = {"LimL", "LimF", "LimR", "LimRe"};
 
-/* LimL/LimR — Z, LimF/LimRe — X (как 7e2) */
-static uint8_t limit_active[4];
-static int32_t limit_pos[4];
+/* LimL(0)/LimR(2) — Z, LimF(1)/LimRe(3) — X */
+static uint8_t limit_active[4];  /* 1 — лимит установлен */
+static int32_t limit_pos[4];     /* координата лимита, шаги */
 
 static void limit_beep(void) {
     if (!config_get_buzzer_on()) return;
@@ -50,7 +50,7 @@ void limits_ui_init(void) {
     }
 }
 
-static uint8_t can_set_limit(uint8_t idx, int32_t pos) {
+static uint8_t can_set_limit(uint8_t idx, int32_t pos) {  /* проверка min<max пары */
     if (idx == 0) {
         if (limit_active[2] && pos >= limit_pos[2]) return 0;
     } else if (idx == 2) {

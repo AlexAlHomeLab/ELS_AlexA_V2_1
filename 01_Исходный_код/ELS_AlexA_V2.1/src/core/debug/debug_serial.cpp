@@ -101,7 +101,8 @@ void debug_log_jog(int32_t steps, uint8_t axis, int32_t coord_steps) {
 #endif
 }
 
-void debug_log_jog_move(const char *kind, int32_t tx, int32_t tz, float spd, uint8_t extend) {
+void debug_log_jog_move(const char *kind, int32_t tx, int32_t tz, float spd, uint8_t extend,
+                        uint8_t lim_hit, uint8_t lim_cmp, int32_t lim_cmp_stp) {
 #if DEBUG_ENABLED
     uint8_t lvl = extend ? DEBUG_LEVEL_VERBOSE : DEBUG_LEVEL_INFO;
     if (!serial_enabled || lvl > DEBUG_LEVEL) return;
@@ -116,7 +117,42 @@ void debug_log_jog_move(const char *kind, int32_t tx, int32_t tz, float spd, uin
     Serial.print(" F");
     Serial.print((int)spd);
     if (extend) Serial.print(" ext");
+    if (lim_hit) Serial.print(" lim");
+    if (lim_cmp) {
+        Serial.print(" lcmp ");
+        Serial.print(lim_cmp_stp);
+    }
     Serial.println();
+#endif
+}
+
+void debug_log_jog_stop(int32_t tx, int32_t tz) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    Serial.print("[INFO] [MOT] [JOG] stop X");
+    Serial.print(tx);
+    Serial.print(" Z");
+    Serial.println(tz);
+#endif
+}
+
+void debug_log_mpg_pulse(uint8_t axis, int32_t pos) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    Serial.print("[INFO] [MOT] [MPG] ");
+    Serial.print(axis == AXIS_X ? 'X' : 'Z');
+    Serial.print(' ');
+    Serial.println(pos);
+#endif
+}
+
+void debug_log_limit_cmp(uint8_t axis, int32_t dist_stp) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    Serial.print("[INFO] [MOT] [LIM] ");
+    Serial.print(axis == AXIS_X ? 'X' : 'Z');
+    Serial.print(" lcmp ");
+    Serial.println(dist_stp);
 #endif
 }
 
@@ -161,7 +197,7 @@ void debug_log_backlash(const char *evt, uint8_t axis, uint8_t dir, int32_t val)
     Serial.print(" dir");
     Serial.print(dir ? '+' : '-');
     if (val != 0) {
-        Serial.print(" val ");
+        Serial.print(" stp");
         Serial.print(val);
     }
     Serial.println();
