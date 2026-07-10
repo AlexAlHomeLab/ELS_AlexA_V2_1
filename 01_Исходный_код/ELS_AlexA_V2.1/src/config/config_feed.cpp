@@ -16,8 +16,8 @@ typedef struct {
 static FeedRangeRaw_t feed_ranges[CONFIG_FEED_RANGE_COUNT];
 
 static const FeedRangeRaw_t feed_defaults[CONFIG_FEED_RANGE_COUNT] = {
-    {20, 400},  /* Async: mm/min */
-    {2, 20},    /* Sync: 0.02..0.20 mm/rev */
+    {CONFIG_FEED_ASYNC_MIN_DEFAULT, CONFIG_FEED_ASYNC_MAX_DEFAULT},
+    {CONFIG_FEED_SYNC_MIN_DEFAULT, CONFIG_FEED_SYNC_MAX_DEFAULT},
 };
 
 /* Async: все режимы кроме Sync и Thread */
@@ -72,7 +72,7 @@ static uint16_t map_inverted_discrete(uint16_t min_raw, uint16_t max_raw, uint16
 
 static float raw_to_value(FeedRangeId_t range_id, uint16_t raw) {
     if (range_id == FEED_RANGE_SYNC) {
-        return (float)raw * 0.01f;
+        return (float)raw * CONFIG_FEED_SYNC_RAW_SCALE;
     }
     return (float)raw;
 }
@@ -163,8 +163,9 @@ float config_feed_map_adc(uint8_t mode, uint16_t adc) {
     const FeedRangeRaw_t *r = &feed_ranges[id];
     uint16_t raw = map_inverted_discrete(r->min_raw, r->max_raw, adc);
 
-    if (id == FEED_RANGE_ASYNC && (r->max_raw - r->min_raw) >= 50U) {
-        raw = (uint16_t)(r->min_raw + ((raw - r->min_raw) / 10U) * 10U);
+    if (id == FEED_RANGE_ASYNC && (r->max_raw - r->min_raw) >= CONFIG_FEED_ASYNC_QUANT_SPAN) {
+        raw = (uint16_t)(r->min_raw + ((raw - r->min_raw) / CONFIG_FEED_ASYNC_QUANT_STEP) *
+                         CONFIG_FEED_ASYNC_QUANT_STEP);
     }
 
     return raw_to_value(id, raw);

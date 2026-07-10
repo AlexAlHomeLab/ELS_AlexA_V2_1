@@ -21,14 +21,20 @@ typedef struct {
 typedef struct {
     AxisCfgRaw_t ax[2];
     uint16_t spindle_ppr;
+    uint16_t jog_decel_steps;
 } MachineCfg_t;
 
 static MachineCfg_t machine_cfg;
 
 static const MachineCfg_t machine_defaults = {
-    {{400, 2, 42, 400, 1500, 3, AXIS_Z_DIR_INVERT_DEFAULT},
-     {200, 4, 160, 400, 2000, 3, AXIS_X_DIR_INVERT_DEFAULT}},
-    3000
+    {{AXIS_X_MOTOR_STEPS_DEFAULT, AXIS_X_MICROSTEP_DEFAULT, AXIS_X_SCREW_PITCH_DEFAULT,
+      AXIS_X_MAX_SPEED_DEFAULT, AXIS_X_RAPID_SPEED_DEFAULT, AXIS_X_FEED_ACCEL_DEFAULT,
+      AXIS_X_DIR_INVERT_DEFAULT},
+     {AXIS_Z_MOTOR_STEPS_DEFAULT, AXIS_Z_MICROSTEP_DEFAULT, AXIS_Z_SCREW_PITCH_DEFAULT,
+      AXIS_Z_MAX_SPEED_DEFAULT, AXIS_Z_RAPID_SPEED_DEFAULT, AXIS_Z_FEED_ACCEL_DEFAULT,
+      AXIS_Z_DIR_INVERT_DEFAULT}},
+    SPINDLE_PPR_DEFAULT,
+    JOG_DECEL_STEPS_DEFAULT
 };
 
 static AxisCfgRaw_t *axis_cfg(uint8_t axis) {
@@ -37,12 +43,12 @@ static AxisCfgRaw_t *axis_cfg(uint8_t axis) {
 }
 
 static uint8_t axis_cfg_validate(const AxisCfgRaw_t *a) {
-    if (a->motor_steps < 50 || a->motor_steps > 2000) return 0;
-    if (a->microstep < 1 || a->microstep > 32) return 0;
-    if (a->screw_pitch < 10 || a->screw_pitch > 1000) return 0;
-    if (a->max_speed < 10 || a->max_speed > 5000) return 0;
-    if (a->rapid_speed < 10 || a->rapid_speed > 10000) return 0;
-    if (a->feed_accel < 1 || a->feed_accel > 20) return 0;
+    if (a->motor_steps < AXIS_MOTOR_STEPS_MIN || a->motor_steps > AXIS_MOTOR_STEPS_MAX) return 0;
+    if (a->microstep < AXIS_MICROSTEP_MIN || a->microstep > AXIS_MICROSTEP_MAX) return 0;
+    if (a->screw_pitch < AXIS_SCREW_PITCH_MIN || a->screw_pitch > AXIS_SCREW_PITCH_MAX) return 0;
+    if (a->max_speed < AXIS_MAX_SPEED_MIN || a->max_speed > AXIS_MAX_SPEED_MAX) return 0;
+    if (a->rapid_speed < AXIS_RAPID_SPEED_MIN || a->rapid_speed > AXIS_RAPID_SPEED_MAX) return 0;
+    if (a->feed_accel < AXIS_FEED_ACCEL_MIN || a->feed_accel > AXIS_FEED_ACCEL_MAX) return 0;
     if (a->dir_invert > 1) return 0;
     return 1;
 }
@@ -59,7 +65,8 @@ static uint8_t machine_cfg_checksum(const MachineCfg_t *cfg) {
 static uint8_t machine_cfg_validate(const MachineCfg_t *cfg) {
     if (!axis_cfg_validate(&cfg->ax[AXIS_X])) return 0;
     if (!axis_cfg_validate(&cfg->ax[AXIS_Z])) return 0;
-    if (cfg->spindle_ppr < 100 || cfg->spindle_ppr > 10000) return 0;
+    if (cfg->spindle_ppr < SPINDLE_PPR_MIN || cfg->spindle_ppr > SPINDLE_PPR_MAX) return 0;
+    if (cfg->jog_decel_steps > JOG_DECEL_STEPS_MAX) return 0;
     return 1;
 }
 
@@ -144,6 +151,10 @@ uint16_t config_get_spindle_ppr(void) {
     return machine_cfg.spindle_ppr;
 }
 
+uint16_t config_get_jog_decel_steps(void) {
+    return machine_cfg.jog_decel_steps;
+}
+
 uint32_t config_mm_min_to_sps(uint8_t axis, float mm_min) {
     if (mm_min < 1.0f) mm_min = 1.0f;
     float spm = config_get_steps_per_mm(axis);
@@ -153,32 +164,32 @@ uint32_t config_mm_min_to_sps(uint8_t axis, float mm_min) {
 }
 
 void config_set_motor_steps(uint8_t axis, uint16_t steps) {
-    if (steps < 50 || steps > 2000) return;
+    if (steps < AXIS_MOTOR_STEPS_MIN || steps > AXIS_MOTOR_STEPS_MAX) return;
     axis_cfg(axis)->motor_steps = steps;
 }
 
 void config_set_microstep(uint8_t axis, uint8_t ms) {
-    if (ms < 1 || ms > 32) return;
+    if (ms < AXIS_MICROSTEP_MIN || ms > AXIS_MICROSTEP_MAX) return;
     axis_cfg(axis)->microstep = ms;
 }
 
 void config_set_screw_pitch(uint8_t axis, uint16_t pitch_cents) {
-    if (pitch_cents < 10 || pitch_cents > 1000) return;
+    if (pitch_cents < AXIS_SCREW_PITCH_MIN || pitch_cents > AXIS_SCREW_PITCH_MAX) return;
     axis_cfg(axis)->screw_pitch = pitch_cents;
 }
 
 void config_set_max_speed_mm_min(uint8_t axis, uint16_t mm_min) {
-    if (mm_min < 10 || mm_min > 5000) return;
+    if (mm_min < AXIS_MAX_SPEED_MIN || mm_min > AXIS_MAX_SPEED_MAX) return;
     axis_cfg(axis)->max_speed = mm_min;
 }
 
 void config_set_rapid_speed_mm_min(uint8_t axis, uint16_t mm_min) {
-    if (mm_min < 10 || mm_min > 10000) return;
+    if (mm_min < AXIS_RAPID_SPEED_MIN || mm_min > AXIS_RAPID_SPEED_MAX) return;
     axis_cfg(axis)->rapid_speed = mm_min;
 }
 
 void config_set_feed_accel(uint8_t axis, uint8_t accel) {
-    if (accel < 1 || accel > 20) return;
+    if (accel < AXIS_FEED_ACCEL_MIN || accel > AXIS_FEED_ACCEL_MAX) return;
     axis_cfg(axis)->feed_accel = accel;
 }
 
@@ -187,6 +198,11 @@ void config_set_dir_invert(uint8_t axis, uint8_t invert) {
 }
 
 void config_set_spindle_ppr(uint16_t ppr) {
-    if (ppr < 100 || ppr > 10000) return;
+    if (ppr < SPINDLE_PPR_MIN || ppr > SPINDLE_PPR_MAX) return;
     machine_cfg.spindle_ppr = ppr;
+}
+
+void config_set_jog_decel_steps(uint16_t steps) {
+    if (steps > JOG_DECEL_STEPS_MAX) return;
+    machine_cfg.jog_decel_steps = steps;
 }

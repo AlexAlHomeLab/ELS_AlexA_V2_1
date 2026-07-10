@@ -1,6 +1,7 @@
 #include "fsm_manager.h"
 #include "fsm_core.h"
 #include "../debug/debug_serial.h"
+#include "../motion/planner.h"
 #include "../motion/backlash.h"
 #include "../motion/motion_jog.h"
 #include "../motion/planner.h"
@@ -96,17 +97,19 @@ void fsm_manager_poll(void) {
 }
 
 void fsm_manager_process(void) {
-    if (backlash_startup_busy()) {
+    State_t st;
+
+    planner_process();
+
+    if (planner_startup_busy()) {
         return;
     }
 
-    State_t st = fsm_get_state();
+    st = fsm_get_state();
 
     if (st == STATE_ERROR) {
         return;
     }
-
-    planner_process();
 
     if (st == STATE_MANUAL) {
         motion_jog_joy_poll();

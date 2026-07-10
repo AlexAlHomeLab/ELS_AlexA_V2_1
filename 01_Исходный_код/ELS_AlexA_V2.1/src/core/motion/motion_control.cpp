@@ -31,14 +31,10 @@ void motion_stop(void) {
     backlash_abort_pending();
     dds_set_target(AXIS_X, dds_get_position(AXIS_X));
     dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
-    dds_enable(AXIS_X, 0);
-    dds_enable(AXIS_Z, 0);
-    dds_set_speed(AXIS_X, 0);
-    dds_set_speed(AXIS_Z, 0);
 }
 
 uint8_t motion_is_moving(void) {
-    return planner_is_busy() || !dds_at_target(AXIS_X) || !dds_at_target(AXIS_Z);
+    return planner_is_busy();
 }
 
 int32_t motion_get_pos_steps(uint8_t axis) {

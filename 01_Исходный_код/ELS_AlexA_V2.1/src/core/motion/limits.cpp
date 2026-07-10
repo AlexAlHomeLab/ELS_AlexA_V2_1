@@ -1,7 +1,6 @@
 #include "limits.h"
 #include "motion_control.h"
 #include "motion_jog.h"
-#include "backlash.h"
 #include "stepper_gen.h"
 #include "../debug/debug_serial.h"
 #include "../hal/hal_pins.h"
@@ -87,7 +86,6 @@ void limits_ui_on_click(uint8_t idx) {
     limit_active[idx] = 1;
     limit_pos[idx] = pos;
     LIMIT_LED_ON(limit_led_pins[idx]);
-    backlash_sync_axis(limit_idx_to_axis(idx), dds_get_direction(limit_idx_to_axis(idx)));
     DBG_INFO_VAL_I32("UI", "LIM", limit_names[idx], pos);
     limit_beep();
 }

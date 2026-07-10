@@ -1,18 +1,20 @@
 #include "config_backlash.h"
+#include "config_machine.h"
 #include "config_defs.h"
 #include "../core/debug/debug_serial.h"
 #include <Arduino.h>
 #include <EEPROM.h>
 
-#define EEPROM_BACKLASH_MAGIC   0xB1
+#define EEPROM_BACKLASH_MAGIC   0xB2
 #define EEPROM_BACKLASH_ADDR    56
-#define EEPROM_BACKLASH_ADDR_SUM 63
+#define EEPROM_BACKLASH_ADDR_SUM 64
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t auto_on;
     uint16_t steps_x;
     uint16_t steps_z;
-    uint16_t auto_speed;
+    uint8_t auto_speed;
+    uint8_t min_speed;
 } BacklashCfg_t;
 
 static BacklashCfg_t bl_cfg;
@@ -21,8 +23,27 @@ static const BacklashCfg_t bl_defaults = {
     BACKLASH_AUTO_DEFAULT,
     BACKLASH_X_STEPS_DEFAULT,
     BACKLASH_Z_STEPS_DEFAULT,
-    BACKLASH_AUTO_SPEED_DEFAULT
+    (uint8_t)BACKLASH_AUTO_SPEED_DEFAULT,
+    (uint8_t)BACKLASH_MIN_SPEED_DEFAULT
 };
+
+static void bl_cfg_normalize_speeds(void) {
+    if (bl_cfg.auto_speed < BACKLASH_AUTO_SPEED_MIN) {
+        bl_cfg.auto_speed = (uint8_t)BACKLASH_AUTO_SPEED_MIN;
+    }
+    if (bl_cfg.auto_speed > BACKLASH_AUTO_SPEED_MAX) {
+        bl_cfg.auto_speed = (uint8_t)BACKLASH_AUTO_SPEED_MAX;
+    }
+    if (bl_cfg.min_speed < BACKLASH_MIN_SPEED_MIN) {
+        bl_cfg.min_speed = (uint8_t)BACKLASH_MIN_SPEED_MIN;
+    }
+    if (bl_cfg.min_speed > BACKLASH_MIN_SPEED_MAX) {
+        bl_cfg.min_speed = (uint8_t)BACKLASH_MIN_SPEED_MAX;
+    }
+    if (bl_cfg.min_speed > bl_cfg.auto_speed) {
+        bl_cfg.min_speed = bl_cfg.auto_speed;
+    }
+}
 
 static uint8_t bl_cfg_checksum(const BacklashCfg_t *c) {
     uint8_t sum = EEPROM_BACKLASH_MAGIC;
@@ -41,6 +62,11 @@ static uint8_t bl_cfg_validate(const BacklashCfg_t *c) {
         c->auto_speed > BACKLASH_AUTO_SPEED_MAX) {
         return 0;
     }
+    if (c->min_speed < BACKLASH_MIN_SPEED_MIN ||
+        c->min_speed > BACKLASH_MIN_SPEED_MAX) {
+        return 0;
+    }
+    if (c->min_speed > c->auto_speed) return 0;
     return 1;
 }
 
@@ -81,6 +107,7 @@ void config_backlash_load(void) {
 }
 
 void config_backlash_save(void) {
+    bl_cfg_normalize_speeds();
     if (!bl_cfg_validate(&bl_cfg)) {
         bl_cfg_apply_defaults();
     }
@@ -104,6 +131,10 @@ uint16_t config_backlash_get_auto_speed(void) {
     return bl_cfg.auto_speed;
 }
 
+uint16_t config_backlash_get_min_speed(void) {
+    return bl_cfg.min_speed;
+}
+
 void config_backlash_set_auto_on(uint8_t on) {
     bl_cfg.auto_on = on ? 1U : 0U;
 }
@@ -121,5 +152,25 @@ void config_backlash_set_steps_z(uint16_t steps) {
 void config_backlash_set_auto_speed(uint16_t mm_min) {
     if (mm_min < BACKLASH_AUTO_SPEED_MIN) mm_min = BACKLASH_AUTO_SPEED_MIN;
     if (mm_min > BACKLASH_AUTO_SPEED_MAX) mm_min = BACKLASH_AUTO_SPEED_MAX;
-    bl_cfg.auto_speed = mm_min;
+    bl_cfg.auto_speed = (uint8_t)mm_min;
+    bl_cfg_normalize_speeds();
+}
+
+void config_backlash_set_min_speed(uint16_t mm_min) {
+    if (mm_min < BACKLASH_MIN_SPEED_MIN) mm_min = BACKLASH_MIN_SPEED_MIN;
+    if (mm_min > BACKLASH_MIN_SPEED_MAX) mm_min = BACKLASH_MIN_SPEED_MAX;
+    bl_cfg.min_speed = (uint8_t)mm_min;
+    bl_cfg_normalize_speeds();
+}
+
+float config_backlash_comp_speed_mm_min(uint8_t axis, float feed_mm_min) {
+    float min_s = (float)bl_cfg.min_speed;
+    float max_s = (float)bl_cfg.auto_speed;
+    float cap = (float)config_get_max_speed_mm_min(axis);
+
+    if (feed_mm_min < min_s) feed_mm_min = min_s;
+    if (feed_mm_min > max_s) feed_mm_min = max_s;
+    if (feed_mm_min < 1.0f) feed_mm_min = 1.0f;
+    if (feed_mm_min > cap) feed_mm_min = cap;
+    return feed_mm_min;
 }

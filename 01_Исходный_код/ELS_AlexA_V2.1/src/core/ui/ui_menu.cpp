@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MENU_PARAM_COUNT 25
+#define MENU_PARAM_COUNT 27
 #define MENU_EDIT_LEN 8
 
 #define MENU_MODE_BROWSE 0
@@ -34,30 +34,32 @@ static uint8_t param_idx = 0;
 static uint8_t digit_pos = 0;
 static char edit_buf[MENU_EDIT_LEN + 1];
 
-static uint16_t edit_async_min = 20;
-static uint16_t edit_async_max = 400;
-static uint16_t edit_sync_min = 2;
-static uint16_t edit_sync_max = 20;
-static uint16_t edit_z_steps = 200;
-static uint8_t edit_z_ustep = 4;
-static uint16_t edit_z_pitch = 160;
-static uint16_t edit_z_max = 400;
-static uint16_t edit_z_rapid = 2000;
-static uint8_t edit_z_accel = 3;
-static uint16_t edit_x_steps = 400;
-static uint8_t edit_x_ustep = 2;
-static uint16_t edit_x_pitch = 42;
-static uint16_t edit_x_max = 400;
-static uint16_t edit_x_rapid = 1500;
-static uint8_t edit_x_accel = 3;
+static uint16_t edit_async_min = CONFIG_FEED_ASYNC_MIN_DEFAULT;
+static uint16_t edit_async_max = CONFIG_FEED_ASYNC_MAX_DEFAULT;
+static uint16_t edit_sync_min = CONFIG_FEED_SYNC_MIN_DEFAULT;
+static uint16_t edit_sync_max = CONFIG_FEED_SYNC_MAX_DEFAULT;
+static uint16_t edit_z_steps = AXIS_Z_MOTOR_STEPS_DEFAULT;
+static uint8_t edit_z_ustep = AXIS_Z_MICROSTEP_DEFAULT;
+static uint16_t edit_z_pitch = AXIS_Z_SCREW_PITCH_DEFAULT;
+static uint16_t edit_z_max = AXIS_Z_MAX_SPEED_DEFAULT;
+static uint16_t edit_z_rapid = AXIS_Z_RAPID_SPEED_DEFAULT;
+static uint8_t edit_z_accel = AXIS_Z_FEED_ACCEL_DEFAULT;
+static uint16_t edit_x_steps = AXIS_X_MOTOR_STEPS_DEFAULT;
+static uint8_t edit_x_ustep = AXIS_X_MICROSTEP_DEFAULT;
+static uint16_t edit_x_pitch = AXIS_X_SCREW_PITCH_DEFAULT;
+static uint16_t edit_x_max = AXIS_X_MAX_SPEED_DEFAULT;
+static uint16_t edit_x_rapid = AXIS_X_RAPID_SPEED_DEFAULT;
+static uint8_t edit_x_accel = AXIS_X_FEED_ACCEL_DEFAULT;
 static uint8_t edit_z_dir_inv = AXIS_Z_DIR_INVERT_DEFAULT;
 static uint8_t edit_x_dir_inv = AXIS_X_DIR_INVERT_DEFAULT;
-static uint16_t edit_spindle_ppr = 3000;
+static uint16_t edit_spindle_ppr = SPINDLE_PPR_DEFAULT;
+static uint16_t edit_jog_decel = JOG_DECEL_STEPS_DEFAULT;
 static uint8_t edit_buzzer = CONFIG_BUZZER_DEFAULT;
 static uint8_t edit_bl_auto = BACKLASH_AUTO_DEFAULT;
 static uint16_t edit_bl_x = BACKLASH_X_STEPS_DEFAULT;
 static uint16_t edit_bl_z = BACKLASH_Z_STEPS_DEFAULT;
 static uint16_t edit_bl_speed = BACKLASH_AUTO_SPEED_DEFAULT;
+static uint16_t edit_bl_min_speed = BACKLASH_MIN_SPEED_DEFAULT;
 static uint8_t edit_coord_units = COORD_UNIT_DEFAULT;
 
 
@@ -76,23 +78,23 @@ typedef struct {
 } ParamDef_t;
 
 static const ParamDef_t param_def[MENU_PARAM_COUNT] = {
-    {"aMin", PTYPE_UINT, 10, 990},
-    {"aMax", PTYPE_UINT, 20, 1000},
-    {"sMin", PTYPE_CENTS, 1, 199},
-    {"sMax", PTYPE_CENTS, 2, 200},
-    {"Zstp", PTYPE_UINT, 50, 2000},
-    {"ZuSt", PTYPE_USTEP, 1, 32},
-    {"Zpit", PTYPE_CENTS, 10, 1000},
-    {"Zmax", PTYPE_UINT, 10, 5000},
-    {"Zrap", PTYPE_UINT, 10, 10000},
-    {"Zacc", PTYPE_UINT, 1, 20},
-    {"Xstp", PTYPE_UINT, 50, 2000},
-    {"XuSt", PTYPE_USTEP, 1, 32},
-    {"Xpit", PTYPE_CENTS, 10, 1000},
-    {"Xmax", PTYPE_UINT, 10, 5000},
-    {"Xrap", PTYPE_UINT, 10, 10000},
-    {"Xacc", PTYPE_UINT, 1, 20},
-    {"Spdl", PTYPE_UINT, 100, 10000},
+    {"aMin", PTYPE_UINT, CONFIG_FEED_ASYNC_EDIT_MIN_LOW, CONFIG_FEED_ASYNC_EDIT_MIN_HIGH},
+    {"aMax", PTYPE_UINT, CONFIG_FEED_ASYNC_EDIT_MAX_LOW, CONFIG_FEED_ASYNC_EDIT_MAX_HIGH},
+    {"sMin", PTYPE_CENTS, CONFIG_FEED_SYNC_EDIT_MIN_LOW, CONFIG_FEED_SYNC_EDIT_MIN_HIGH},
+    {"sMax", PTYPE_CENTS, CONFIG_FEED_SYNC_EDIT_MAX_LOW, CONFIG_FEED_SYNC_EDIT_MAX_HIGH},
+    {"Zstp", PTYPE_UINT, AXIS_MOTOR_STEPS_MIN, AXIS_MOTOR_STEPS_MAX},
+    {"ZuSt", PTYPE_USTEP, AXIS_MICROSTEP_MIN, AXIS_MICROSTEP_MAX},
+    {"Zpit", PTYPE_CENTS, AXIS_SCREW_PITCH_MIN, AXIS_SCREW_PITCH_MAX},
+    {"Zmax", PTYPE_UINT, AXIS_MAX_SPEED_MIN, AXIS_MAX_SPEED_MAX},
+    {"Zrap", PTYPE_UINT, AXIS_RAPID_SPEED_MIN, AXIS_RAPID_SPEED_MAX},
+    {"Zacc", PTYPE_UINT, AXIS_FEED_ACCEL_MIN, AXIS_FEED_ACCEL_MAX},
+    {"Xstp", PTYPE_UINT, AXIS_MOTOR_STEPS_MIN, AXIS_MOTOR_STEPS_MAX},
+    {"XuSt", PTYPE_USTEP, AXIS_MICROSTEP_MIN, AXIS_MICROSTEP_MAX},
+    {"Xpit", PTYPE_CENTS, AXIS_SCREW_PITCH_MIN, AXIS_SCREW_PITCH_MAX},
+    {"Xmax", PTYPE_UINT, AXIS_MAX_SPEED_MIN, AXIS_MAX_SPEED_MAX},
+    {"Xrap", PTYPE_UINT, AXIS_RAPID_SPEED_MIN, AXIS_RAPID_SPEED_MAX},
+    {"Xacc", PTYPE_UINT, AXIS_FEED_ACCEL_MIN, AXIS_FEED_ACCEL_MAX},
+    {"Spdl", PTYPE_UINT, SPINDLE_PPR_MIN, SPINDLE_PPR_MAX},
     {"Buzz", PTYPE_BOOL, 0, 1},
     {"Zinv", PTYPE_BOOL, 0, 1},
     {"Xinv", PTYPE_BOOL, 0, 1},
@@ -100,6 +102,8 @@ static const ParamDef_t param_def[MENU_PARAM_COUNT] = {
     {"BlX", PTYPE_UINT, 0, BACKLASH_STEPS_MAX},
     {"BlZ", PTYPE_UINT, 0, BACKLASH_STEPS_MAX},
     {"BlSp", PTYPE_UINT, BACKLASH_AUTO_SPEED_MIN, BACKLASH_AUTO_SPEED_MAX},
+    {"BlMn", PTYPE_UINT, BACKLASH_MIN_SPEED_MIN, BACKLASH_MIN_SPEED_MAX},
+    {"Jdec", PTYPE_UINT, JOG_DECEL_STEPS_MIN, JOG_DECEL_STEPS_MAX},
     {"CrdU", PTYPE_UINT, 0, 2},
 };
 
@@ -126,6 +130,8 @@ static uint16_t *menu_param_ptr_u16(uint8_t idx) {
     case 21: return &edit_bl_x;
     case 22: return &edit_bl_z;
     case 23: return &edit_bl_speed;
+    case 24: return &edit_bl_min_speed;
+    case 25: return &edit_jog_decel;
     default: return NULL;
     }
 }
@@ -140,7 +146,7 @@ static uint8_t *menu_param_ptr_u8(uint8_t idx) {
     case 18: return &edit_z_dir_inv;
     case 19: return &edit_x_dir_inv;
     case 20: return &edit_bl_auto;
-    case 24: return &edit_coord_units;
+    case 26: return &edit_coord_units;
     default: return NULL;
     }
 }
@@ -188,6 +194,8 @@ static void menu_load_values(void) {
     edit_bl_x = config_backlash_get_steps_x();
     edit_bl_z = config_backlash_get_steps_z();
     edit_bl_speed = config_backlash_get_auto_speed();
+    edit_bl_min_speed = config_backlash_get_min_speed();
+    edit_jog_decel = config_get_jog_decel_steps();
     edit_coord_units = config_get_coord_units();
 }
 
@@ -549,12 +557,14 @@ static void menu_save_all(void) {
     config_set_feed_accel(AXIS_X, edit_x_accel);
     config_set_dir_invert(AXIS_Z, edit_z_dir_inv);
     config_set_dir_invert(AXIS_X, edit_x_dir_inv);
+    config_set_jog_decel_steps(edit_jog_decel);
     config_machine_save();
 
     config_backlash_set_auto_on(edit_bl_auto);
     config_backlash_set_steps_x(edit_bl_x);
     config_backlash_set_steps_z(edit_bl_z);
     config_backlash_set_auto_speed(edit_bl_speed);
+    config_backlash_set_min_speed(edit_bl_min_speed);
     config_backlash_save();
     backlash_reload_steps();
 

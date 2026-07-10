@@ -1,7 +1,7 @@
 #include "backlash.h"
-#include "stepper_gen.h"
 #include "../../config/config.h"
 #include "../../config/config_machine.h"
+#include "../../config/config_backlash.h"
 #include "../debug/debug_serial.h"
 #include <Arduino.h>
 
@@ -13,12 +13,6 @@ static uint8_t synced_x = 0;
 static uint8_t synced_z = 0;
 static volatile int32_t rem_x = 0;
 static volatile int32_t rem_z = 0;
-
-#define BL_STARTUP_TIMEOUT_MS 60000UL
-
-static uint8_t bl_startup_active = 0;
-static uint8_t bl_startup_axis = 0xFF;
-static unsigned long bl_startup_t0 = 0;
 
 static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
 {
@@ -79,9 +73,11 @@ static void backlash_load_steps_from_config(void)
 #endif
 }
 
-static void backlash_queue_takeup(uint8_t axis, uint8_t dir, int32_t steps)
+void backlash_queue_takeup(uint8_t axis, uint8_t dir, int32_t steps)
 {
     volatile int32_t *rem = (axis == AXIS_X) ? &rem_x : &rem_z;
+
+    (void)dir;
 
     if (!backlash_enabled() || steps <= 0) {
         return;
@@ -113,98 +109,6 @@ void backlash_init(void)
     rem_z = 0;
 }
 
-static void backlash_startup_axis_begin(uint8_t axis)
-{
-    int32_t steps = (axis == AXIS_X) ? backlash_steps_x : backlash_steps_z;
-    uint8_t ref = (axis == AXIS_X) ? BACKLASH_REF_DIR_X : BACKLASH_REF_DIR_Z;
-    uint32_t sps = config_mm_min_to_sps(axis, (float)config_backlash_get_auto_speed());
-
-    backlash_queue_takeup(axis, ref, steps);
-    dds_set_direction(axis, ref);
-    dds_set_target(axis, dds_get_position(axis));
-    dds_set_speed(axis, sps);
-    dds_enable(axis, 1);
-    bl_startup_axis = axis;
-}
-
-static void backlash_startup_axis_stop(uint8_t axis)
-{
-    dds_enable(axis, 0);
-    dds_set_speed(axis, 0);
-}
-
-static void backlash_startup_axis_done(uint8_t axis)
-{
-    uint8_t ref = (axis == AXIS_X) ? BACKLASH_REF_DIR_X : BACKLASH_REF_DIR_Z;
-    backlash_startup_axis_stop(axis);
-    backlash_sync_axis(axis, ref);
-}
-
-void backlash_startup_begin(void)
-{
-    bl_startup_active = 0;
-    bl_startup_axis = 0xFF;
-
-    if (!backlash_enabled() || !config_backlash_get_auto_on()) {
-        DBG_INFO("MOT", "BL", "auto skip");
-        return;
-    }
-
-    DBG_INFO("MOT", "BL", "auto start");
-
-    if (backlash_steps_x > 0) {
-        backlash_startup_axis_begin(AXIS_X);
-        bl_startup_active = 1;
-        bl_startup_t0 = millis();
-        return;
-    }
-    if (backlash_steps_z > 0) {
-        backlash_startup_axis_begin(AXIS_Z);
-        bl_startup_active = 1;
-        bl_startup_t0 = millis();
-        return;
-    }
-
-    DBG_INFO("MOT", "BL", "auto zero");
-}
-
-void backlash_startup_poll(void)
-{
-    if (!bl_startup_active || bl_startup_axis > AXIS_Z) {
-        return;
-    }
-
-    if (millis() - bl_startup_t0 >= BL_STARTUP_TIMEOUT_MS) {
-        backlash_startup_axis_stop(bl_startup_axis);
-        backlash_abort_pending();
-        bl_startup_active = 0;
-        bl_startup_axis = 0xFF;
-        DBG_INFO("MOT", "BL", "auto timeout");
-        return;
-    }
-
-    if (backlash_pending(bl_startup_axis) > 0) {
-        return;
-    }
-
-    backlash_startup_axis_done(bl_startup_axis);
-
-    if (bl_startup_axis == AXIS_X && backlash_steps_z > 0) {
-        backlash_startup_axis_begin(AXIS_Z);
-        bl_startup_t0 = millis();
-        return;
-    }
-
-    bl_startup_active = 0;
-    bl_startup_axis = 0xFF;
-    DBG_INFO("MOT", "BL", "auto done");
-}
-
-uint8_t backlash_startup_busy(void)
-{
-    return bl_startup_active;
-}
-
 void backlash_sync_axis(uint8_t axis, uint8_t dir)
 {
     if (axis == AXIS_X) {
@@ -214,6 +118,17 @@ void backlash_sync_axis(uint8_t axis, uint8_t dir)
     } else {
         last_dir_z = dir;
         synced_z = 1;
+        rem_z = 0;
+    }
+}
+
+void backlash_unsync_axis(uint8_t axis)
+{
+    if (axis == AXIS_X) {
+        synced_x = 0;
+        rem_x = 0;
+    } else {
+        synced_z = 0;
         rem_z = 0;
     }
 }

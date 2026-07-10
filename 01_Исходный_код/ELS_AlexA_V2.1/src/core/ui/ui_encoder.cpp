@@ -55,6 +55,27 @@ int32_t ui_encoder_get_mpg_delta(void) {
     return delta;
 }
 
+int32_t ui_encoder_consume_mpg_tick(void) {
+    int32_t snap;
+    int32_t d;
+
+    cli();
+    snap = hand_count;
+    d = snap - hand_count_last;
+    if (d > 0) {
+        hand_count_last++;
+        sei();
+        return 1;
+    }
+    if (d < 0) {
+        hand_count_last--;
+        sei();
+        return -1;
+    }
+    sei();
+    return 0;
+}
+
 void ui_encoder_reset_mpg(void) {
     cli();
     hand_count = 0;

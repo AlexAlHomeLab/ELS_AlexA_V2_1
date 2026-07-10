@@ -7,14 +7,11 @@
 extern "C" {
 #endif
 
-/* Выборка люфта: шаги в ISR без изменения логической координаты (grblHAL). */
-
 void backlash_init(void);
 void backlash_reload_steps(void);
-void backlash_startup_begin(void);
-void backlash_startup_poll(void);
-uint8_t backlash_startup_busy(void);
+void backlash_queue_takeup(uint8_t axis, uint8_t dir, int32_t steps);
 void backlash_sync_axis(uint8_t axis, uint8_t dir);
+void backlash_unsync_axis(uint8_t axis);
 void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable);
 void backlash_abort_pending(void);
 

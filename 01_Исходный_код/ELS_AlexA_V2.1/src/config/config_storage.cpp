@@ -26,7 +26,7 @@ static void config_read_raw(uint8_t *magic, uint8_t *feed, uint8_t *buzzer, uint
 
 static uint8_t config_validate_raw(uint8_t magic, uint8_t feed, uint8_t buzzer, uint8_t checksum) {
     if (magic != CONFIG_EEPROM_MAGIC) return 0;
-    if (feed < 10 || feed > 100) return 0;
+    if (feed < CONFIG_FEED_MAX_MIN || feed > CONFIG_FEED_MAX_LIMIT) return 0;
     if (buzzer > 1) return 0;
     return checksum == config_checksum(magic, feed, buzzer);
 }
@@ -94,8 +94,8 @@ uint8_t config_get_buzzer_on(void) {
 }
 
 void config_set_feed_max(uint8_t pct) {
-    if (pct < 10) pct = 10;
-    if (pct > 100) pct = 100;
+    if (pct < CONFIG_FEED_MAX_MIN) pct = CONFIG_FEED_MAX_MIN;
+    if (pct > CONFIG_FEED_MAX_LIMIT) pct = CONFIG_FEED_MAX_LIMIT;
     cfg_feed_max = pct;
 }
 

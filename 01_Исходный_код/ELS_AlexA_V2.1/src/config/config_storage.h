@@ -9,7 +9,9 @@ extern "C" {
 
 #define CONFIG_EEPROM_MAGIC 0xA5
 #define CONFIG_FEED_MAX_DEFAULT 100
-#define CONFIG_BUZZER_DEFAULT 1
+#define CONFIG_FEED_MAX_MIN     10
+#define CONFIG_FEED_MAX_LIMIT   100
+#define CONFIG_BUZZER_DEFAULT   1
 
 void config_load(void);
 void config_save(void);

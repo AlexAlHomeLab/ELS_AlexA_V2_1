@@ -1,7 +1,7 @@
 #include "../../config/config.h"
-#include "debug_serial.h"
-
 #include "../../config/config_defs.h"
+#include "../../config/config_machine.h"
+#include "debug_serial.h"
 #include <Arduino.h>
 
 static uint8_t serial_enabled = 1;
@@ -101,6 +101,56 @@ void debug_log_jog(int32_t steps, uint8_t axis, int32_t coord_steps) {
 #endif
 }
 
+void debug_log_jog_move(const char *kind, int32_t tx, int32_t tz, float spd, uint8_t extend) {
+#if DEBUG_ENABLED
+    uint8_t lvl = extend ? DEBUG_LEVEL_VERBOSE : DEBUG_LEVEL_INFO;
+    if (!serial_enabled || lvl > DEBUG_LEVEL) return;
+    Serial.print("[");
+    Serial.print(extend ? "VERB" : "INFO");
+    Serial.print("] [MOT] [");
+    Serial.print(kind);
+    Serial.print("] X");
+    Serial.print(tx);
+    Serial.print(" Z");
+    Serial.print(tz);
+    Serial.print(" F");
+    Serial.print((int)spd);
+    if (extend) Serial.print(" ext");
+    Serial.println();
+#endif
+}
+
+void debug_log_planner_add(uint8_t backlash, uint8_t axis, uint32_t dst_steps,
+                           float x_mm, float z_mm, float speed_mm_min,
+                           float entry_mm_min, float exit_mm_min, uint8_t queue_len) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    Serial.print("[INFO] [PLN] [");
+    Serial.print(backlash ? "BL" : "ADD");
+    Serial.print("] ");
+    if (backlash) {
+        Serial.print(axis == AXIS_X ? 'X' : 'Z');
+        Serial.print(" stp");
+        Serial.print(dst_steps);
+    } else {
+        Serial.print("X");
+        Serial.print(x_mm, 3);
+        Serial.print(" Z");
+        Serial.print(z_mm, 3);
+        Serial.print(" dst");
+        Serial.print(dst_steps);
+    }
+    Serial.print(" F");
+    Serial.print((int)(speed_mm_min + 0.5f));
+    Serial.print(" Ein");
+    Serial.print((int)(entry_mm_min + 0.5f));
+    Serial.print(" Eout");
+    Serial.print((int)(exit_mm_min + 0.5f));
+    Serial.print(" q");
+    Serial.println(queue_len);
+#endif
+}
+
 void debug_log_backlash(const char *evt, uint8_t axis, uint8_t dir, int32_t val) {
 #if DEBUG_ENABLED
     if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
@@ -115,5 +165,66 @@ void debug_log_backlash(const char *evt, uint8_t axis, uint8_t dir, int32_t val)
         Serial.print(val);
     }
     Serial.println();
+#endif
+}
+
+static void debug_pln_print_axis(uint8_t axis) {
+    Serial.print(axis == AXIS_X ? 'X' : 'Z');
+}
+
+static int debug_pln_rate_to_f(uint8_t axis, uint32_t rate_sps) {
+    float spm = config_get_steps_per_mm(axis);
+    if (spm < 1.0f) return 0;
+    return (int)((float)rate_sps * 60.0f / spm + 0.5f);
+}
+
+void debug_log_planner_dir(uint8_t axis, int8_t dir, int32_t pos, int32_t tgt) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    Serial.print("[INFO] [PLN] [DIR] ");
+    debug_pln_print_axis(axis);
+    Serial.print(' ');
+    Serial.print(dir > 0 ? '+' : '-');
+    Serial.print(" pos");
+    Serial.print(pos);
+    Serial.print(" tgt");
+    Serial.println(tgt);
+#endif
+}
+
+void debug_log_planner_cruise(uint8_t axis, uint32_t step_ev, uint32_t rate_sps,
+                              uint32_t nominal_sps, int32_t pos) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    Serial.print("[INFO] [PLN] [CRUISE] ");
+    debug_pln_print_axis(axis);
+    Serial.print(" stp");
+    Serial.print(step_ev);
+    Serial.print(" F");
+    Serial.print(debug_pln_rate_to_f(axis, rate_sps));
+    Serial.print(" Fnom");
+    Serial.print(debug_pln_rate_to_f(axis, nominal_sps));
+    Serial.print(" pos");
+    Serial.println(pos);
+#endif
+}
+
+void debug_log_planner_decel(uint8_t axis, uint32_t step_ev, uint32_t rate_sps,
+                             uint32_t dec_after, uint32_t step_cnt, int32_t pos) {
+#if DEBUG_ENABLED
+    if (!serial_enabled || DEBUG_LEVEL_INFO > DEBUG_LEVEL) return;
+    uint32_t remain = (step_cnt > step_ev) ? (step_cnt - step_ev) : 0U;
+    Serial.print("[INFO] [PLN] [DECEL] ");
+    debug_pln_print_axis(axis);
+    Serial.print(" stp");
+    Serial.print(step_ev);
+    Serial.print(" F");
+    Serial.print(debug_pln_rate_to_f(axis, rate_sps));
+    Serial.print(" dec");
+    Serial.print(dec_after);
+    Serial.print(" rem");
+    Serial.print(remain);
+    Serial.print(" pos");
+    Serial.println(pos);
 #endif
 }

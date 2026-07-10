@@ -12,6 +12,7 @@
 #include "src/core/hal/hal_timers.h"
 #include "src/core/fsm/fsm_manager.h"
 #include "src/core/motion/limits.h"
+#include "src/core/motion/planner.h"
 #include "src/core/motion/backlash.h"
 #include "src/core/motion/motion_control.h"
 #include "src/core/motion/motion_jog.h"
@@ -181,7 +182,7 @@ static void lcd_format_coords_line(char *buf, size_t len) {
 }
 
 static void update_main_lcd(void) {
-    if (backlash_startup_busy()) {
+    if (planner_startup_busy()) {
         ui_lcd_set_line(0, "BL takeup...        ");
         memset(lcd_line, ' ', LCD_COLS);
         memcpy(lcd_line, "Wait", 4);
@@ -273,11 +274,10 @@ void setup() {
 void loop() {
     if (!startup_armed) {
         startup_armed = 1;
-        backlash_startup_begin();
+        planner_startup_backlash_queue();
     }
 
     estop_check();
-    backlash_startup_poll();
     ui_buttons_poll();
     ui_switches_poll();
     fsm_manager_poll();
