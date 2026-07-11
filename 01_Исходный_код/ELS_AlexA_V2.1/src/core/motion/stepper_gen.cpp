@@ -139,7 +139,7 @@ static uint32_t motion_profile_denom(void) {
     return p->step_count;
 }
 
-static void motion_update_dirs(int32_t dx, int32_t dz);
+static void motion_update_dirs(int32_t dx, int32_t dz, float feed_mm_min);
 
 /* Фаза профиля: 0 разгон, 1 крейсер, 2 торможение, 0xFF неактивен */
 static uint8_t motion_profile_phase(const MotionProfile_t *p) {
@@ -248,27 +248,41 @@ void dds_motion_log_poll(void) {  /* main: вывод записей лога в
     }
 }
 
-/* Ограничить step_increment при активной выборке люфта */
+/* Подача оси для arm люфта: фактическая скорость профиля или номинал */
+static float motion_bl_feed_mm_min(uint8_t axis) {
+    float spd;
+    float spm;
+
+    if (!motion_prof.active) {
+        return (float)config_backlash_get_min_speed();
+    }
+    spd = dds_motion_get_speed_mm_min(axis);
+    if (spd >= 1.0f) {
+        return spd;
+    }
+    spm = config_get_steps_per_mm(axis);
+    if (spm >= 1.0f && motion_prof.nominal_rate > 0U) {
+        return (float)motion_prof.nominal_rate * 60.0f / spm;
+    }
+    return (float)config_backlash_get_min_speed();
+}
+
+/* Задать step_increment выборки по сохранённой подаче arm */
 static void motion_boost_backlash_rates(void) {
     uint8_t axis;
     AxisState_t *axes[2] = {&axis_x, &axis_z};
-    uint32_t min_inc;
-    uint32_t max_inc;
+    float feed;
+    float spd;
+    uint32_t inc;
 
     for (axis = 0; axis < 2U; axis++) {
         if (backlash_pending(axis) <= 0) continue;
 
-        min_inc = dds_calc_increment(
-            config_mm_min_to_sps(axis, (float)config_backlash_get_min_speed()));
-        max_inc = dds_calc_increment(
-            config_mm_min_to_sps(axis, (float)config_backlash_get_auto_speed()));
-
-        if (axes[axis]->step_increment < min_inc) {
-            axes[axis]->step_increment = min_inc;
-        }
-        if (axes[axis]->step_increment > max_inc) {
-            axes[axis]->step_increment = max_inc;
-        }
+        feed = backlash_get_arm_feed_mm_min(axis);
+        spd = config_backlash_runtime_speed_mm_min(axis, feed);
+        inc = dds_calc_increment(config_mm_min_to_sps(axis, spd));
+        if (inc < 1U) inc = 1U;
+        axes[axis]->step_increment = inc;
     }
 }
 
@@ -452,7 +466,7 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
             if (a->direction != fwd) {
                 a->direction = fwd;
                 dir_set(fwd);
-                backlash_arm_axis(axis, fwd, 1);
+                backlash_arm_axis(axis, fwd, 1, motion_bl_feed_mm_min(axis));
                 mlog_push_dir(axis, fwd ? 1 : -1, a->position, a->target_position);
             } else {
                 dir_set(fwd);
@@ -467,7 +481,7 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
         if (a->direction != fwd) {
             a->direction = fwd;
             dir_set(fwd);
-            backlash_arm_axis(axis, fwd, 1);
+            backlash_arm_axis(axis, fwd, 1, motion_bl_feed_mm_min(axis));
             mlog_push_dir(axis, fwd ? 1 : -1, a->position, a->target_position);
         } else {
             dir_set(fwd);
@@ -669,7 +683,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
             uint32_t entry_sps;
             uint32_t accel_dist;
 
-            motion_update_dirs(dx, dz);
+            motion_update_dirs(dx, dz, cmd->nominal_mm_min);
             axis_x.target_position = dds_start.tx;
             axis_z.target_position = dds_start.tz;
             if (dds_start.ux > 0U) dds_enable(AXIS_X, 1U);
@@ -711,7 +725,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
             if (axis_x.direction != nd) {
                 mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, dds_start.tx);
             }
-            backlash_arm_axis(AXIS_X, nd, 1);
+            backlash_arm_axis(AXIS_X, nd, 1, cmd->nominal_mm_min);
             dds_set_direction(AXIS_X, nd);
         }
         if (dz != 0) {
@@ -719,7 +733,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
             if (axis_z.direction != nd) {
                 mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, dds_start.tz);
             }
-            backlash_arm_axis(AXIS_Z, nd, 1);
+            backlash_arm_axis(AXIS_Z, nd, 1, cmd->nominal_mm_min);
             dds_set_direction(AXIS_Z, nd);
         }
 
@@ -761,13 +775,13 @@ dds_motion_start_exit:
 }
 
 /* Установить DIR и arm люфта при смене знака смещения (jog retarget) */
-static void motion_update_dirs(int32_t dx, int32_t dz) {
+static void motion_update_dirs(int32_t dx, int32_t dz, float feed_mm_min) {
     if (dx != 0) {
         uint8_t nd = (dx > 0) ? 1U : 0U;
         if (axis_x.direction != nd) {
             mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, axis_x.position + dx);
         }
-        backlash_arm_axis(AXIS_X, nd, 1);
+        backlash_arm_axis(AXIS_X, nd, 1, feed_mm_min);
         dds_set_direction(AXIS_X, nd);
     }
     if (dz != 0) {
@@ -775,7 +789,7 @@ static void motion_update_dirs(int32_t dx, int32_t dz) {
         if (axis_z.direction != nd) {
             mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, axis_z.position + dz);
         }
-        backlash_arm_axis(AXIS_Z, nd, 1);
+        backlash_arm_axis(AXIS_Z, nd, 1, feed_mm_min);
         dds_set_direction(AXIS_Z, nd);
     }
 }
@@ -849,7 +863,7 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
         goto dds_retarget_exit;
     }
 
-    motion_update_dirs(dx, dz);
+    motion_update_dirs(dx, dz, cmd->nominal_mm_min);
     dds_set_target(AXIS_X, cmd->target_x);
     dds_set_target(AXIS_Z, cmd->target_z);
     if (motion_prof.jog_cruise) {
@@ -914,11 +928,13 @@ dds_retarget_exit:
 
 /* Старт докрутки люфта на оси (pos==target, только rem>0) */
 static void dds_bl_drain_axis(uint8_t axis) {
+    float spd;
     uint32_t sps;
 
+    spd = config_backlash_runtime_speed_mm_min(axis, backlash_get_arm_feed_mm_min(axis));
     dds_enable(axis, 1U);
     motion_prof.axis_steps[axis] = 1U;
-    sps = config_mm_min_to_sps(axis, (float)config_backlash_get_min_speed());
+    sps = config_mm_min_to_sps(axis, spd);
     if (axis == AXIS_X) {
         axis_x.step_increment = dds_calc_increment(sps);
     } else {

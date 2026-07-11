@@ -68,9 +68,23 @@ static uint8_t synced_x = 0;   /* 1 — люфт синхронизирован 
 static uint8_t synced_z = 0;
 static volatile int32_t rem_x = 0;  /* остаток выборки (ISR) */
 static volatile int32_t rem_z = 0;
+static float bl_feed_x = 0.0f;      /* подача при arm, мм/мин */
+static float bl_feed_z = 0.0f;
+
+static void bl_store_feed(uint8_t axis, float feed_mm_min)
+{
+    if (feed_mm_min < 1.0f) {
+        feed_mm_min = (float)config_backlash_get_min_speed();
+    }
+    if (axis == AXIS_X) {
+        bl_feed_x = feed_mm_min;
+    } else {
+        bl_feed_z = feed_mm_min;
+    }
+}
 
 /* Поставить rem=steps при смене направления (BACKLASH_FIRST_MOVE) */
-static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
+static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable, float feed_mm_min)
 {
     uint8_t synced = (axis == AXIS_Z) ? synced_z : synced_x;
     uint8_t last_dir = (axis == AXIS_Z) ? last_dir_z : last_dir_x;
@@ -96,6 +110,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
             case BACKLASH_FIRST_ALWAYS:
                 *rem = steps;
                 *armed_dir = new_dir;
+                bl_store_feed(axis, feed_mm_min);
                 bl_log_start(axis, new_dir, steps);
                 return;
             case BACKLASH_FIRST_REF:
@@ -110,6 +125,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
 
     *rem = steps;
     *armed_dir = new_dir;
+    bl_store_feed(axis, feed_mm_min);
     bl_log_start(axis, new_dir, steps);
 }
 
@@ -177,6 +193,8 @@ void backlash_init(void)
     rem_z = 0;
     armed_dir_x = BACKLASH_REF_DIR_X;
     armed_dir_z = BACKLASH_REF_DIR_Z;
+    bl_feed_x = 0.0f;
+    bl_feed_z = 0.0f;
     bl_log_w = 0;
     bl_log_r = 0;
 }
@@ -205,13 +223,23 @@ void backlash_unsync_axis(uint8_t axis)
     }
 }
 
-void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable)
+void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable, float feed_mm_min)
 {
     if (axis == AXIS_X) {
-        backlash_arm_one(AXIS_X, new_dir, enable);
+        backlash_arm_one(AXIS_X, new_dir, enable, feed_mm_min);
     } else {
-        backlash_arm_one(AXIS_Z, new_dir, enable);
+        backlash_arm_one(AXIS_Z, new_dir, enable, feed_mm_min);
     }
+}
+
+float backlash_get_arm_feed_mm_min(uint8_t axis)
+{
+    float feed = (axis == AXIS_X) ? bl_feed_x : bl_feed_z;
+
+    if (feed < 1.0f) {
+        feed = (float)config_backlash_get_min_speed();
+    }
+    return feed;
 }
 
 void backlash_abort_pending(void)

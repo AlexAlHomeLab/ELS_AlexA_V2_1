@@ -18,10 +18,11 @@ void backlash_queue_takeup(uint8_t axis, uint8_t dir, int32_t steps);
 
 void backlash_sync_axis(uint8_t axis, uint8_t dir);    /* люфт взяты, last_dir=dir */
 void backlash_unsync_axis(uint8_t axis);               /* сброс synced, rem=0 */
-void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable);  /* при смене DIR */
+void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable, float feed_mm_min);
 void backlash_abort_pending(void);                     /* отмена rem_x/rem_z */
 
 int32_t backlash_pending(uint8_t axis);  /* оставшиеся шаги выборки */
+float backlash_get_arm_feed_mm_min(uint8_t axis);      /* подача при последнем arm */
 
 /* 1 если шаг «съеден» люфтом (позиция не меняется) */
 uint8_t backlash_consume_step(uint8_t axis, uint8_t dir);

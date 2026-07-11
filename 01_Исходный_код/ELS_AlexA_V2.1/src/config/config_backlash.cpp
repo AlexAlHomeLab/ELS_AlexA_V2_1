@@ -175,3 +175,13 @@ float config_backlash_comp_speed_mm_min(uint8_t axis, float feed_mm_min) {
     if (feed_mm_min > cap) feed_mm_min = cap;
     return feed_mm_min;
 }
+
+float config_backlash_runtime_speed_mm_min(uint8_t axis, float feed_mm_min) {
+    float min_s = (float)bl_cfg.min_speed;
+    float cap = (float)config_get_max_speed_mm_min(axis);
+
+    if (feed_mm_min < min_s) feed_mm_min = min_s;
+    if (feed_mm_min < 1.0f) feed_mm_min = 1.0f;
+    if (feed_mm_min > cap) feed_mm_min = cap;
+    return feed_mm_min;
+}

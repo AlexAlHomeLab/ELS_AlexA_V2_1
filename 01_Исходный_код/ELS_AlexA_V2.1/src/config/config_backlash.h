@@ -25,8 +25,11 @@ void config_backlash_set_steps_z(uint16_t steps);
 void config_backlash_set_auto_speed(uint16_t mm_min);
 void config_backlash_set_min_speed(uint16_t mm_min);
 
-/* Ограничить feed в диапазоне [min_speed, auto_speed] и max_speed оси */
+/* Ограничить feed в диапазоне [min_speed, auto_speed] и max_speed оси (BlAu) */
 float config_backlash_comp_speed_mm_min(uint8_t axis, float feed_mm_min);
+
+/* Скорость выборки при jog/MPG: max(feed, BlMn), потолок max_speed оси */
+float config_backlash_runtime_speed_mm_min(uint8_t axis, float feed_mm_min);
 
 #ifdef __cplusplus
 }
