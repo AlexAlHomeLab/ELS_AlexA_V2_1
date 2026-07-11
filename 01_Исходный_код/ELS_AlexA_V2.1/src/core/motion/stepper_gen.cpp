@@ -3,6 +3,7 @@
 #include "backlash.h"
 #include "limits.h"
 #include "../debug/debug_serial.h"
+#include "../debug/debug_trace.h"
 #include "../../config/config.h"
 #include "../../config/config_machine.h"
 #include <avr/interrupt.h>
@@ -355,6 +356,8 @@ static void motion_profile_step(uint8_t axis) {
 
     if (!p->active || axis != p->master_axis) return;
 
+    TRACE_ENTER_ISR(TR_ISR_MPROF_STEP);
+
     if (p->current_rate < 1U) p->current_rate = 1U;
 
     phase_before = motion_profile_phase(p);
@@ -378,13 +381,16 @@ static void motion_profile_step(uint8_t axis) {
         }
     }
     motion_apply_rates();
+    TRACE_ENTER_ISR(TR_ISR_MPROF_RATE);
 
     phase_after = motion_profile_phase(p);
     if (phase_before == 0U && phase_after >= 1U) {
         mlog_push_cruise(p);
+        TRACE_ENTER_ISR(TR_ISR_MPROF_LOG);
     }
     if (phase_before < 2U && phase_after == 2U) {
         mlog_push_decel(p);
+        TRACE_ENTER_ISR(TR_ISR_MPROF_LOG);
     }
 }
 
@@ -449,6 +455,7 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
 
     if (!a->enabled || a->step_increment == 0U) return;
 
+    TRACE_ENTER_ISR(TR_ISR_AXIS_RUN);
     fwd = a->direction;
 
     if (motion_prof.jog_cruise) {
@@ -489,6 +496,7 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
         uint8_t bl_only;
 
         a->accumulator -= 0x80000000UL;
+        TRACE_ENTER_ISR(TR_ISR_AXIS_PULSE);
         step_on();
         bl_only = backlash_consume_step(axis, fwd);
         if (!bl_only) {
@@ -503,11 +511,15 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
 }
 
 void stepper_generate_steps(void) {  /* ISR: шаг X, шаг Z, завершение профиля */
+    TRACE_ENTER_ISR(TR_ISR_ENTER);
     dds_axis_step(AXIS_X, &axis_x, step_x_on, step_x_off, dir_x_set);
+    TRACE_ENTER_ISR(TR_ISR_AFTER_X);
     dds_axis_step(AXIS_Z, &axis_z, step_z_on, step_z_off, dir_z_set);
+    TRACE_ENTER_ISR(TR_ISR_AFTER_Z);
 
     /* jog cruise: не гасим профиль у цели — retarget джойстика продолжит без разгона с нуля */
     if (motion_prof.active && motion_prof.bl_drain) {
+        TRACE_ENTER_ISR(TR_ISR_BL_DRAIN);
         if (backlash_pending(AXIS_X) <= 0 && backlash_pending(AXIS_Z) <= 0) {
             motion_prof.active = 0U;
             motion_prof.jog_cruise = 0U;
@@ -521,6 +533,7 @@ void stepper_generate_steps(void) {  /* ISR: шаг X, шаг Z, заверше�
     }
 
     if (motion_prof.active && motion_profile_done()) {
+        TRACE_ENTER_ISR(TR_ISR_PROF_DONE);
         motion_prof.active = 0U;
         axis_x.enabled = 0U;
         axis_z.enabled = 0U;
@@ -608,6 +621,7 @@ void dds_reset_accumulator(void) {
 }
 
 void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / сегмент */
+    TRACE_ENTER(TR_DDS_MOTION_START);
     uint8_t sreg;
 
     if (!cmd) return;
@@ -812,6 +826,7 @@ static void motion_profile_extend(uint32_t remain_um, uint32_t ux, uint32_t uz) 
 }
 
 uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена цели jog на лету */
+    TRACE_ENTER(TR_DDS_JOG_RETARGET);
     uint8_t sreg;
     uint8_t rc = 0U;
     int32_t cx;
@@ -938,6 +953,7 @@ static void dds_bl_drain_axis(uint8_t axis) {
 }
 
 void dds_motion_jog_release(void) {  /* отпускание jog: стоп позиции, докрутка люфта */
+    TRACE_ENTER(TR_DDS_JOG_RELEASE);
     uint8_t sreg = SREG;
     uint8_t bl_x;
     uint8_t bl_z;
@@ -1024,6 +1040,7 @@ uint8_t dds_motion_busy(void) {
 }
 
 void dds_motion_stop(void) {  /* сброс профиля и отключение шагов */
+    TRACE_ENTER(TR_DDS_MOTION_STOP);
     uint8_t sreg = SREG;
 
     cli();

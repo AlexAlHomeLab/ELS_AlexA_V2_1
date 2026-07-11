@@ -19,10 +19,9 @@ void timer1_init(uint16_t period_us) {
 }
 
 ISR(TIMER1_COMPA_vect) {
-    cli();
+    /* Без sei() внутри: иначе реентrant TIMER1/LCD и переполнение стека */
     stepper_ticks++;
     stepper_generate_steps();
-    sei();
 }
 
 void timer2_init(void) {

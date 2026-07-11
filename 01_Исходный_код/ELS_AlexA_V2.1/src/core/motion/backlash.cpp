@@ -183,7 +183,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable, uint
 
 static void backlash_load_steps_from_config(void)  /* EEPROM или CENTIMM по умолчанию */
 {
-#ifdef ENABLE_BACKLASH
+#if ENABLE_BACKLASH
     float spm_x = config_get_steps_per_mm(AXIS_X);
     float spm_z = config_get_steps_per_mm(AXIS_Z);
     uint16_t cx = config_backlash_get_steps_x();
@@ -354,11 +354,7 @@ uint8_t backlash_consume_step(uint8_t axis, uint8_t dir)  /* 1 = шаг «съе
 
 uint8_t backlash_enabled(void)
 {
-#ifdef ENABLE_BACKLASH
-    return 1;
-#else
-    return 0;
-#endif
+    return ENABLE_BACKLASH ? 1U : 0U;
 }
 
 void backlash_set_steps(uint8_t axis, int32_t steps)

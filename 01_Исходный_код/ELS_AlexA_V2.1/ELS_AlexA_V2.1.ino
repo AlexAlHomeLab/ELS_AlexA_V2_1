@@ -6,6 +6,7 @@
 #include "src/config/config.h"
 #include "src/config/config_storage.h"
 #include "src/core/debug/debug_serial.h"
+#include "src/core/debug/debug_trace.h"
 #include "src/core/debug/serial_config.h"
 #include "src/core/hal/hal_init.h"
 #include "src/core/hal/hal_interrupts.h"
@@ -37,6 +38,25 @@ static unsigned long last_pot_ms = 0;
 static uint8_t startup_armed = 0;
 static uint8_t lcd_dirty = 1;       /* 1 — буфер не совпадает с экраном / первый кадр */
 static uint8_t lcd_menu_was = 0;    /* предыдущее ui_menu_is_active() */
+
+#if DEBUG_ENABLED
+/* Расшифровка MCUSR ATmega2560: POR/EXT/BOR/WDR/JTG */
+static void debug_print_reset_cause(uint8_t mcusr) {
+    debug_serial_print("RST MCUSR=");
+    Serial.println(mcusr);
+    debug_serial_print("RST flg:");
+    if (mcusr == 0U) {
+        debug_serial_println(" none");
+        return;
+    }
+    if (mcusr & _BV(PORF)) Serial.print(F(" POR"));
+    if (mcusr & _BV(EXTRF)) Serial.print(F(" EXT"));
+    if (mcusr & _BV(BORF)) Serial.print(F(" BOR"));
+    if (mcusr & _BV(WDRF)) Serial.print(F(" WDR"));
+    if (mcusr & _BV(JTRF)) Serial.print(F(" JTG"));
+    Serial.println();
+}
+#endif
 
 /* Снимок полей главного экрана для cheap dirty-check (без snprintf). */
 typedef struct {
@@ -356,12 +376,12 @@ static void lcd_mark_dirty_if_changed(void) {
 void setup() {
     hal_init();
     debug_serial_init(SERIAL_BAUD);
+    trace_crash_init();
     {
         uint8_t mcusr = MCUSR;
         MCUSR = 0;
 #if DEBUG_ENABLED
-        debug_serial_print("RST MCUSR=");
-        Serial.println(mcusr);
+        debug_print_reset_cause(mcusr);
 #endif
     }
     serial_config_init();

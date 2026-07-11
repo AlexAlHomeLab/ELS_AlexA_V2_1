@@ -20,7 +20,7 @@
 #define LCD_UPDATE_MS 80          /* период обновления дисплея */
 #define POT_READ_MS 100           /* период опроса потенциометра */
 
-#define DEBUG_ENABLED 1
+#define DEBUG_ENABLED 0
 
 #define DEBUG_LEVEL_ERROR   0
 #define DEBUG_LEVEL_WARNING 1
@@ -29,6 +29,15 @@
 
 #ifndef DEBUG_LEVEL
 #define DEBUG_LEVEL DEBUG_LEVEL_INFO
+#endif
+
+/* Трассировка краша: TRACE_ENTER(id) в цепочке MPG/jog (debug_trace.h) */
+#ifndef TRACE_CRASH_ENABLED
+#define TRACE_CRASH_ENABLED  0
+#endif
+/* 1 — печать >NN в Serial при каждом TRACE_ENTER (main); 0 — только LST/ISR при ребуте */
+#ifndef TRACE_CRASH_SERIAL
+#define TRACE_CRASH_SERIAL   0
 #endif
 
 #define BTN_DEBOUNCE_MS 50

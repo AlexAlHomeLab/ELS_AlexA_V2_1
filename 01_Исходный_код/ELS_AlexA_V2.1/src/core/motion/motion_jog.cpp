@@ -6,6 +6,7 @@
 #include "../../config/config.h"
 #include "../../config/config_machine.h"
 #include "../debug/debug_serial.h"
+#include "../debug/debug_trace.h"
 #include "../process/estop_control.h"
 #include "../motion/limits.h"
 #include "../ui/ui_buttons.h"
@@ -226,6 +227,7 @@ static void mpg_sync_overshoot(uint8_t axis) {  /* cmd не отстаёт от 
 
 static void mpg_planner_commit(uint8_t axis, const SwitchState_t *sw, const ButtonState_t *btn,
                                uint8_t lim_hit) {
+    TRACE_ENTER(TR_MPG_COMMIT);
     /* mpg_cmd → planner_exec_jog cruise */
     int32_t tx;
     int32_t tz;

@@ -6,6 +6,7 @@
 #include "../../config/config_machine.h"
 #include "../../config/config_backlash.h"
 #include "../debug/debug_serial.h"
+#include "../debug/debug_trace.h"
 #include "../ui/ui_pot.h"
 #include <avr/interrupt.h>
 #include <math.h>
@@ -277,6 +278,7 @@ static int32_t pln_clamp_jog_target(int32_t pos, int32_t tgt) {
 
 uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char *kind, uint8_t cruise,
                          uint8_t lim_hit, uint8_t lim_cmp, int32_t lim_cmp_stp) {
+    TRACE_ENTER(TR_PLANNER_EXEC_JOG);
     /* retarget если jog активен; иначе stop + start; cruise = MOTION_FLAG_JOG_CRUISE */
     static MotionCommand_t cmd;
     float entry = 0.0f;
@@ -350,6 +352,7 @@ uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char 
 }
 
 void planner_jog_halt(void) {
+    TRACE_ENTER(TR_PLANNER_JOG_HALT);
     uint8_t sreg = SREG;
     int32_t tx;
     int32_t tz;
@@ -366,6 +369,7 @@ void planner_jog_halt(void) {
 }
 
 void planner_jog_stop(void) {
+    TRACE_ENTER(TR_PLANNER_JOG_STOP);
     uint8_t was_busy = dds_motion_busy();
     int32_t tx;
     int32_t tz;

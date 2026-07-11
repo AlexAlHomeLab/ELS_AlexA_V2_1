@@ -32,11 +32,11 @@ static uint8_t joy_trace_mask = 0;
 
 static uint8_t joy_read_mask(void) {
     uint8_t m = 0;
-    if (btn_joy_left.read()) m |= 1U;
-    if (btn_joy_right.read()) m |= 2U;
-    if (btn_joy_up.read()) m |= 4U;
-    if (btn_joy_down.read()) m |= 8U;
-    if (btn_joy_rapid.read()) m |= 16U;
+    if (btn_joy_left.pressing()) m |= 1U;
+    if (btn_joy_right.pressing()) m |= 2U;
+    if (btn_joy_up.pressing()) m |= 4U;
+    if (btn_joy_down.pressing()) m |= 8U;
+    if (btn_joy_rapid.pressing()) m |= 16U;
     return m;
 }
 
@@ -82,6 +82,11 @@ void ui_buttons_init(void) {
     set_btn_level(btn_joy_up);
     set_btn_level(btn_joy_down);
     set_btn_level(btn_joy_rapid);
+    btn_joy_left.setDebTimeout(BTN_DEBOUNCE_MS);
+    btn_joy_right.setDebTimeout(BTN_DEBOUNCE_MS);
+    btn_joy_up.setDebTimeout(BTN_DEBOUNCE_MS);
+    btn_joy_down.setDebTimeout(BTN_DEBOUNCE_MS);
+    btn_joy_rapid.setDebTimeout(BTN_DEBOUNCE_MS);
     set_btn_level(btn_limit_left);
     set_btn_level(btn_limit_front);
     set_btn_level(btn_limit_right);
@@ -96,10 +101,10 @@ static uint8_t joy_feed_dir(uint8_t *axis, int8_t *sign) {
     int8_t zs = 0;
     int8_t xs = 0;
 
-    if (btn_joy_left.read()) { z = 1; zs = -1; }
-    else if (btn_joy_right.read()) { z = 1; zs = 1; }
-    if (btn_joy_up.read()) { x = 1; xs = 1; }
-    else if (btn_joy_down.read()) { x = 1; xs = -1; }
+    if (btn_joy_left.pressing()) { z = 1; zs = -1; }
+    else if (btn_joy_right.pressing()) { z = 1; zs = 1; }
+    if (btn_joy_up.pressing()) { x = 1; xs = 1; }
+    else if (btn_joy_down.pressing()) { x = 1; xs = -1; }
     if (z && x) return 0;
     if (z) { *axis = AXIS_Z; *sign = zs; return 1; }
     if (x) { *axis = AXIS_X; *sign = xs; return 1; }
@@ -125,7 +130,7 @@ static void log_limit_event(const char *name, VirtButton &btn, uint8_t idx) {
         return;
     }
     if (btn.click()) {
-        if (btn_joy_rapid.read()) {
+        if (btn_joy_rapid.pressing()) {
             DBG_INFO("UI", "GOLIM", name);
             motion_jog_go_limit(idx);
             return;
@@ -202,14 +207,12 @@ void ui_buttons_poll(void) {
     btn_state.down = btn_down.pressing();
     btn_state.select = btn_select.pressing();
     btn_state.select_hold = btn_select.holding();
-    /* Джойстик: read() — сырое состояние пина для удержания (jog).
-     * pressing() ломается после menu_save_all(): EEPROM блокирует loop,
-     * millis не тикает, EncButton теряет EB_PRS при удержании. */
-    btn_state.joy_left = btn_joy_left.read();
-    btn_state.joy_right = btn_joy_right.read();
-    btn_state.joy_up = btn_joy_up.read();
-    btn_state.joy_down = btn_joy_down.read();
-    btn_state.joy_rapid = btn_joy_rapid.read();
+    /* Джойстик: pressing() + BTN_DEBOUNCE_MS; сброс — ui_buttons_reset_joy() */
+    btn_state.joy_left = btn_joy_left.pressing();
+    btn_state.joy_right = btn_joy_right.pressing();
+    btn_state.joy_up = btn_joy_up.pressing();
+    btn_state.joy_down = btn_joy_down.pressing();
+    btn_state.joy_rapid = btn_joy_rapid.pressing();
     btn_state.limit_left = btn_limit_left.pressing();
     btn_state.limit_front = btn_limit_front.pressing();
     btn_state.limit_right = btn_limit_right.pressing();
