@@ -22,11 +22,6 @@
 #define AXIS_Z_DIR_INVERT_DEFAULT 0
 #endif
 
-/* Инверсия знака тика РГИ (не меняет dir_invert мотора) */
-#ifndef MPG_AXIS_Z_INVERT
-#define MPG_AXIS_Z_INVERT 1           /* РГИ Z: программный реверс */
-#endif
-
 /* --- FSM: коды ошибок и тип цикла --- */
 #define ERR_INVALID_TRANSITION 1
 #define ERR_LIMIT              2
@@ -57,13 +52,13 @@
 #define BACKLASH_FIRST_REF      2
 #define BACKLASH_FIRST_MOVE     BACKLASH_FIRST_ALWAYS
 /* Дистанция выборки по умолчанию (импульсы); EEPROM переопределяет */
-#define BACKLASH_X_STEPS_DEFAULT    1010
-#define BACKLASH_Z_STEPS_DEFAULT    100
+#define BACKLASH_X_STEPS_DEFAULT    1130  //3 сотки на 100 микрошагов
+#define BACKLASH_Z_STEPS_DEFAULT    625   //8 соток на 100 микрошагов
 #define BACKLASH_X_CENTIMM            34
 #define BACKLASH_Z_CENTIMM            46
 #define BACKLASH_STEPS_MAX            5000
 /* Автовыборка при включении (EEPROM $40 / меню BlAu) */
-#define BACKLASH_AUTO_DEFAULT         1
+#define BACKLASH_AUTO_DEFAULT         0
 #define BACKLASH_AUTO_SPEED_DEFAULT   50
 #define BACKLASH_AUTO_SPEED_MIN       5
 #define BACKLASH_AUTO_SPEED_MAX       200

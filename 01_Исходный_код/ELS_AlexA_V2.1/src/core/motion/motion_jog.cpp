@@ -27,7 +27,7 @@
 #define MPG_IDLE_STOP_MS 80UL     /* пауза после тика → дотягивание до cmd */
 #define MPG_BATCH_MS 8UL          /* ожидание всех detent перед первым exec */
 #define MPG_IDLE_DECEL_MS 250UL   /* сброс mpg_active после простоя */
-#define MPG_REV_IGNORE_TICKS 3    /* игнор тиков при смене направления РГИ */
+#define MPG_REV_IGNORE_TICKS 5    /* игнор тиков при смене направления РГИ */
 #define MPG_AXIS_ARM_LOOPS 2U     /* пропуск poll после смены оси РГИ */
 
 static int32_t hand_pos[2];       /* накопленное смещение РГИ, шаги */
@@ -709,7 +709,12 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
 
         if (mpg_active && dds_motion_busy()) {
             lock_sign = mpg_motion_sign(axis);
-            if (lock_sign != 0) mpg_dir_lock = lock_sign;
+            if (lock_sign != 0) {
+                mpg_dir_lock = lock_sign;
+            } else if (mpg_dir_lock != 0) {
+                /* pos==target, cruise ещё active — знак из dir_lock, иначе реверс без фильтра */
+                lock_sign = mpg_dir_lock;
+            }
         } else if (mpg_dir_lock != 0) {
             lock_sign = mpg_dir_lock;
         }
