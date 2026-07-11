@@ -473,8 +473,8 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
     if (x_on && !was_x_on) hand_reset_axis(AXIS_X);
 
     if ((z_on && !was_z_on) || (x_on && !was_x_on)) {
-        if (dds_motion_busy()) {
-            dds_motion_stop();
+        if (dds_motion_busy() || backlash_pending(AXIS_X) > 0 || backlash_pending(AXIS_Z) > 0) {
+            planner_jog_stop();
         }
     }
 

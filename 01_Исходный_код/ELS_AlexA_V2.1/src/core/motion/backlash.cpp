@@ -62,6 +62,8 @@ static int32_t backlash_steps_x = 0;   /* шаги выборки X */
 static int32_t backlash_steps_z = 0;   /* шаги выборки Z */
 static uint8_t last_dir_x = BACKLASH_REF_DIR_X;  /* последнее физ. направление */
 static uint8_t last_dir_z = BACKLASH_REF_DIR_Z;
+static uint8_t armed_dir_x;  /* направление текущей выборки (пока rem>0) */
+static uint8_t armed_dir_z;
 static uint8_t synced_x = 0;   /* 1 — люфт синхронизирован */
 static uint8_t synced_z = 0;
 static volatile int32_t rem_x = 0;  /* остаток выборки (ISR) */
@@ -72,6 +74,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
 {
     uint8_t synced = (axis == AXIS_Z) ? synced_z : synced_x;
     uint8_t last_dir = (axis == AXIS_Z) ? last_dir_z : last_dir_x;
+    uint8_t *armed_dir = (axis == AXIS_Z) ? &armed_dir_z : &armed_dir_x;
     int32_t steps = (axis == AXIS_Z) ? backlash_steps_z : backlash_steps_x;
     volatile int32_t *rem = (axis == AXIS_Z) ? &rem_z : &rem_x;
 
@@ -80,7 +83,10 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
     }
 
     if (*rem > 0) {
-        return;
+        if (new_dir == *armed_dir) {
+            return;
+        }
+        *rem = 0;
     }
 
     if (!synced) {
@@ -89,6 +95,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
                 return;
             case BACKLASH_FIRST_ALWAYS:
                 *rem = steps;
+                *armed_dir = new_dir;
                 bl_log_start(axis, new_dir, steps);
                 return;
             case BACKLASH_FIRST_REF:
@@ -102,6 +109,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable)
     }
 
     *rem = steps;
+    *armed_dir = new_dir;
     bl_log_start(axis, new_dir, steps);
 }
 
@@ -139,6 +147,11 @@ void backlash_queue_takeup(uint8_t axis, uint8_t dir, int32_t steps)
     if (*rem > 0) {
         return;
     }
+    if (axis == AXIS_X) {
+        armed_dir_x = dir;
+    } else {
+        armed_dir_z = dir;
+    }
     *rem = steps;
     bl_log_start(axis, dir, steps);
 }
@@ -162,6 +175,8 @@ void backlash_init(void)
     synced_z = 0;
     rem_x = 0;
     rem_z = 0;
+    armed_dir_x = BACKLASH_REF_DIR_X;
+    armed_dir_z = BACKLASH_REF_DIR_Z;
     bl_log_w = 0;
     bl_log_r = 0;
 }

@@ -367,15 +367,22 @@ void planner_jog_halt(void) {
 
 void planner_jog_stop(void) {
     uint8_t was_busy = dds_motion_busy();
-    if (was_busy) {
-        planner_jog_halt();
-    } else {
-        dds_set_target(AXIS_X, dds_get_position(AXIS_X));
-        dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
+    int32_t tx;
+    int32_t tz;
+
+    if (was_busy || backlash_pending(AXIS_X) > 0 || backlash_pending(AXIS_Z) > 0) {
+        dds_motion_jog_release();
+        block_exec = 0;
+        tx = dds_get_position(AXIS_X);
+        tz = dds_get_position(AXIS_Z);
+        if (was_busy) {
+            DBG_JOG_STOP(tx, tz);
+        }
+        return;
     }
-    if (was_busy) {
-        DBG_JOG_STOP(dds_get_position(AXIS_X), dds_get_position(AXIS_Z));
-    }
+
+    dds_set_target(AXIS_X, dds_get_position(AXIS_X));
+    dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
 }
 
 void planner_exec_axis(uint8_t axis, int32_t target_steps, float speed_mm_min, uint8_t jog) {

@@ -17,7 +17,8 @@ typedef struct {
     uint8_t active;              /* 1 — движение выполняется */
     uint8_t flags;               /* копия MotionCommand_t.flags */
     uint8_t jog_cruise;          /* 1 — jog без финального стопа */
-    uint8_t master_axis;         /* ось, по шагам которой считается профиль */
+    uint8_t bl_drain;            /* 1 — докрутка люфта после отпускания jog */
+    uint8_t master_axis;         /* oсь, по шагам которой считается профиль */
     uint32_t step_count;         /* всего step_events до завершения */
     uint32_t step_events;        /* счётчик шагов master-оси */
     uint32_t accelerate_until;   /* step_events до конца разгона */
@@ -477,13 +478,19 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
 
     a->accumulator += a->step_increment;
     if (a->accumulator >= 0x80000000UL) {
+        uint8_t bl_only;
+
         a->accumulator -= 0x80000000UL;
         step_on();
-        if (!backlash_consume_step(axis, fwd)) {
+        bl_only = backlash_consume_step(axis, fwd);
+        if (!bl_only) {
             a->position += fwd ? 1 : -1;
         }
         step_off();
-        motion_profile_step(axis);
+        /* jog cruise: шаги выборки люфта не двигают ось — не ускоряем профиль */
+        if (!bl_only || !motion_prof.jog_cruise) {
+            motion_profile_step(axis);
+        }
     }
 }
 
@@ -491,13 +498,12 @@ void stepper_generate_steps(void) {  /* ISR: шаг X, шаг Z, заверше�
     dds_axis_step(AXIS_X, &axis_x, step_x_on, step_x_off, dir_x_set);
     dds_axis_step(AXIS_Z, &axis_z, step_z_on, step_z_off, dir_z_set);
 
-    if (motion_prof.active && motion_prof.jog_cruise) {
-        if (axis_x.position == axis_x.target_position &&
-            axis_z.position == axis_z.target_position &&
-            backlash_pending(AXIS_X) <= 0 &&
-            backlash_pending(AXIS_Z) <= 0) {
+    /* jog cruise: не гасим профиль у цели — retarget джойстика продолжит без разгона с нуля */
+    if (motion_prof.active && motion_prof.bl_drain) {
+        if (backlash_pending(AXIS_X) <= 0 && backlash_pending(AXIS_Z) <= 0) {
             motion_prof.active = 0U;
             motion_prof.jog_cruise = 0U;
+            motion_prof.bl_drain = 0U;
             axis_x.enabled = 0U;
             axis_z.enabled = 0U;
             axis_x.step_increment = 0U;
@@ -609,6 +615,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
     motion_prof.active = 0U;
     motion_prof.flags = cmd->flags;
     motion_prof.jog_cruise = 0U;
+    motion_prof.bl_drain = 0U;
     motion_prof.axis_steps[AXIS_X] = 0U;
     motion_prof.axis_steps[AXIS_Z] = 0U;
 
@@ -898,12 +905,83 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
     rc = 1U;
 
 dds_retarget_exit:
+    if (rc) {
+        motion_prof.bl_drain = 0U;
+    }
     SREG = sreg;
     return rc;
 }
 
-void dds_motion_jog_release(void) {
-    dds_motion_stop();
+/* Старт докрутки люфта на оси (pos==target, только rem>0) */
+static void dds_bl_drain_axis(uint8_t axis) {
+    uint32_t sps;
+
+    dds_enable(axis, 1U);
+    motion_prof.axis_steps[axis] = 1U;
+    sps = config_mm_min_to_sps(axis, (float)config_backlash_get_min_speed());
+    if (axis == AXIS_X) {
+        axis_x.step_increment = dds_calc_increment(sps);
+    } else {
+        axis_z.step_increment = dds_calc_increment(sps);
+    }
+}
+
+void dds_motion_jog_release(void) {  /* отпускание jog: стоп позиции, докрутка люфта */
+    uint8_t sreg = SREG;
+    uint8_t bl_x;
+    uint8_t bl_z;
+    int32_t px;
+    int32_t pz;
+
+    cli();
+
+    px = axis_x.position;
+    pz = axis_z.position;
+    axis_x.target_position = px;
+    axis_z.target_position = pz;
+
+    bl_x = (backlash_pending(AXIS_X) > 0) ? 1U : 0U;
+    bl_z = (backlash_pending(AXIS_Z) > 0) ? 1U : 0U;
+
+    if (!bl_x && !bl_z) {
+        motion_prof.active = 0U;
+        motion_prof.jog_cruise = 0U;
+        motion_prof.bl_drain = 0U;
+        axis_x.enabled = 0U;
+        axis_z.enabled = 0U;
+        axis_x.step_increment = 0U;
+        axis_z.step_increment = 0U;
+        SREG = sreg;
+        return;
+    }
+
+    motion_prof.active = 1U;
+    motion_prof.jog_cruise = 1U;
+    motion_prof.bl_drain = 1U;
+    motion_prof.flags = MOTION_FLAG_JOG | MOTION_FLAG_JOG_CRUISE;
+    motion_prof.step_count = 0xFFFFFFFFU;
+    motion_prof.decelerate_after = 0xFFFFFFFEU;
+    motion_prof.step_events = 0U;
+    motion_prof.axis_steps[AXIS_X] = 0U;
+    motion_prof.axis_steps[AXIS_Z] = 0U;
+
+    if (bl_x) {
+        dds_bl_drain_axis(AXIS_X);
+    } else {
+        axis_x.enabled = 0U;
+        axis_x.step_increment = 0U;
+    }
+    if (bl_z) {
+        dds_bl_drain_axis(AXIS_Z);
+    } else {
+        axis_z.enabled = 0U;
+        axis_z.step_increment = 0U;
+    }
+
+    motion_prof.master_axis = (bl_x && !bl_z) ? AXIS_X :
+                              ((!bl_x && bl_z) ? AXIS_Z : AXIS_X);
+    motion_boost_backlash_rates();
+    SREG = sreg;
 }
 
 void dds_motion_update_target(uint8_t axis, int32_t target) {
@@ -940,6 +1018,7 @@ void dds_motion_stop(void) {  /* сброс профиля и отключени
     cli();
     motion_prof.active = 0U;
     motion_prof.jog_cruise = 0U;
+    motion_prof.bl_drain = 0U;
     axis_x.enabled = 0U;
     axis_z.enabled = 0U;
     axis_x.step_increment = 0U;
