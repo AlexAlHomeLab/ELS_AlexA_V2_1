@@ -21,7 +21,7 @@ void ui_lcd_init(void) {
 }
 
 void ui_lcd_update(void) {
-    return;
+    //return;
     lcd.noCursor();
     for (uint8_t row = 0; row < LCD_ROWS; row++) {
         lcd.setCursor(0, row);
