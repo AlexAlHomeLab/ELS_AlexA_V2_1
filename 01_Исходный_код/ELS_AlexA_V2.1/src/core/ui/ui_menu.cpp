@@ -628,11 +628,16 @@ static void menu_poll_select(void) {
     }
 
     if (sel_down) {
-        if (!sel_long_fired && cl.select && menu_active && menu_mode == MENU_MODE_BROWSE) {
+        /* Короткое отпускание: edit. Не полагаемся на cl.select — EncButton
+         * при удержании >= EB_HOLD_TIME (600 ms) не даёт click(). */
+        if (!sel_long_fired && menu_active && menu_mode == MENU_MODE_BROWSE) {
             menu_enter_edit();
         }
         sel_down = 0;
         sel_long_fired = 0;
+    } else if (cl.select && menu_active && menu_mode == MENU_MODE_BROWSE) {
+        /* Короткий клик, если нажатие не попало в poll (sel_down не успел). */
+        menu_enter_edit();
     }
 }
 
