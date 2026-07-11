@@ -248,39 +248,33 @@ void dds_motion_log_poll(void) {  /* main: вывод записей лога в
     }
 }
 
-/* Подача оси для arm люфта: фактическая скорость профиля или номинал */
-static float motion_bl_feed_mm_min(uint8_t axis) {
-    float spd;
-    float spm;
+/* steps/s для arm люфта в ISR: current_rate или nominal_rate профиля */
+static uint32_t motion_bl_arm_sps(uint8_t axis) {
+    uint32_t sps;
 
     if (!motion_prof.active) {
-        return (float)config_backlash_get_min_speed();
+        return mm_min_to_sps(axis, (float)config_backlash_get_min_speed());
     }
-    spd = dds_motion_get_speed_mm_min(axis);
-    if (spd >= 1.0f) {
-        return spd;
+    sps = motion_prof.current_rate;
+    if (sps < 1U) {
+        sps = motion_prof.nominal_rate;
     }
-    spm = config_get_steps_per_mm(axis);
-    if (spm >= 1.0f && motion_prof.nominal_rate > 0U) {
-        return (float)motion_prof.nominal_rate * 60.0f / spm;
+    if (sps < 1U) {
+        return mm_min_to_sps(axis, (float)config_backlash_get_min_speed());
     }
-    return (float)config_backlash_get_min_speed();
+    return sps;
 }
 
-/* Задать step_increment выборки по сохранённой подаче arm */
+/* Подставить сохранённый bl_inc (без float в ISR) */
 static void motion_boost_backlash_rates(void) {
     uint8_t axis;
     AxisState_t *axes[2] = {&axis_x, &axis_z};
-    float feed;
-    float spd;
     uint32_t inc;
 
     for (axis = 0; axis < 2U; axis++) {
         if (backlash_pending(axis) <= 0) continue;
 
-        feed = backlash_get_arm_feed_mm_min(axis);
-        spd = config_backlash_runtime_speed_mm_min(axis, feed);
-        inc = dds_calc_increment(config_mm_min_to_sps(axis, spd));
+        inc = backlash_get_arm_inc(axis);
         if (inc < 1U) inc = 1U;
         axes[axis]->step_increment = inc;
     }
@@ -466,7 +460,7 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
             if (a->direction != fwd) {
                 a->direction = fwd;
                 dir_set(fwd);
-                backlash_arm_axis(axis, fwd, 1, motion_bl_feed_mm_min(axis));
+                backlash_arm_axis(axis, fwd, 1, motion_bl_arm_sps(axis));
                 mlog_push_dir(axis, fwd ? 1 : -1, a->position, a->target_position);
             } else {
                 dir_set(fwd);
@@ -481,7 +475,7 @@ static void dds_axis_step(uint8_t axis, AxisState_t *a, void (*step_on)(void), v
         if (a->direction != fwd) {
             a->direction = fwd;
             dir_set(fwd);
-            backlash_arm_axis(axis, fwd, 1, motion_bl_feed_mm_min(axis));
+            backlash_arm_axis(axis, fwd, 1, motion_bl_arm_sps(axis));
             mlog_push_dir(axis, fwd ? 1 : -1, a->position, a->target_position);
         } else {
             dir_set(fwd);
@@ -725,7 +719,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
             if (axis_x.direction != nd) {
                 mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, dds_start.tx);
             }
-            backlash_arm_axis(AXIS_X, nd, 1, cmd->nominal_mm_min);
+            backlash_arm_axis(AXIS_X, nd, 1, mm_min_to_sps(AXIS_X, cmd->nominal_mm_min));
             dds_set_direction(AXIS_X, nd);
         }
         if (dz != 0) {
@@ -733,7 +727,7 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
             if (axis_z.direction != nd) {
                 mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, dds_start.tz);
             }
-            backlash_arm_axis(AXIS_Z, nd, 1, cmd->nominal_mm_min);
+            backlash_arm_axis(AXIS_Z, nd, 1, mm_min_to_sps(AXIS_Z, cmd->nominal_mm_min));
             dds_set_direction(AXIS_Z, nd);
         }
 
@@ -781,7 +775,7 @@ static void motion_update_dirs(int32_t dx, int32_t dz, float feed_mm_min) {
         if (axis_x.direction != nd) {
             mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, axis_x.position + dx);
         }
-        backlash_arm_axis(AXIS_X, nd, 1, feed_mm_min);
+        backlash_arm_axis(AXIS_X, nd, 1, mm_min_to_sps(AXIS_X, feed_mm_min));
         dds_set_direction(AXIS_X, nd);
     }
     if (dz != 0) {
@@ -789,7 +783,7 @@ static void motion_update_dirs(int32_t dx, int32_t dz, float feed_mm_min) {
         if (axis_z.direction != nd) {
             mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, axis_z.position + dz);
         }
-        backlash_arm_axis(AXIS_Z, nd, 1, feed_mm_min);
+        backlash_arm_axis(AXIS_Z, nd, 1, mm_min_to_sps(AXIS_Z, feed_mm_min));
         dds_set_direction(AXIS_Z, nd);
     }
 }
@@ -928,17 +922,18 @@ dds_retarget_exit:
 
 /* Старт докрутки люфта на оси (pos==target, только rem>0) */
 static void dds_bl_drain_axis(uint8_t axis) {
-    float spd;
-    uint32_t sps;
+    uint32_t inc;
 
-    spd = config_backlash_runtime_speed_mm_min(axis, backlash_get_arm_feed_mm_min(axis));
+    inc = backlash_get_arm_inc(axis);
+    if (inc < 1U) {
+        inc = dds_calc_increment(mm_min_to_sps(axis, (float)config_backlash_get_min_speed()));
+    }
     dds_enable(axis, 1U);
     motion_prof.axis_steps[axis] = 1U;
-    sps = config_mm_min_to_sps(axis, spd);
     if (axis == AXIS_X) {
-        axis_x.step_increment = dds_calc_increment(sps);
+        axis_x.step_increment = inc;
     } else {
-        axis_z.step_increment = dds_calc_increment(sps);
+        axis_z.step_increment = inc;
     }
 }
 

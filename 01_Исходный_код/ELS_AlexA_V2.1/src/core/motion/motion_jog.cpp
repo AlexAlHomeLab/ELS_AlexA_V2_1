@@ -60,6 +60,11 @@ static void go_limit_stop(void) {  /* отмена go_lim */
 
 static void hand_reset_axis(uint8_t axis) {
     hand_pos[axis] = 0;
+    mpg_cmd[axis] = dds_get_position(axis);
+    if (axis == mpg_axis_last) {
+        mpg_dir_lock = 0;
+        mpg_rev_cnt = 0;
+    }
     ui_encoder_reset_mpg();
     DBG_VERBOSE_VAL("JOG", "HAND", axis == AXIS_X ? "Xrst" : "Zrst", 0);
 }

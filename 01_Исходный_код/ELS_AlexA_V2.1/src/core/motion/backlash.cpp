@@ -70,21 +70,73 @@ static volatile int32_t rem_x = 0;  /* остаток выборки (ISR) */
 static volatile int32_t rem_z = 0;
 static float bl_feed_x = 0.0f;      /* подача при arm, мм/мин */
 static float bl_feed_z = 0.0f;
+static uint32_t bl_inc_x = 0U;      /* DDS increment выборки X */
+static uint32_t bl_inc_z = 0U;      /* DDS increment выборки Z */
+static uint32_t bl_min_sps_x = 1U;  /* BlMn → steps/s, кэш */
+static uint32_t bl_min_sps_z = 1U;
+static uint32_t bl_max_sps_x = 1U;  /* BlSp → steps/s, кэш */
+static uint32_t bl_max_sps_z = 1U;
 
-static void bl_store_feed(uint8_t axis, float feed_mm_min)
+/* DDS increment без stepper_gen (ISR-safe) */
+static uint32_t bl_calc_increment(uint32_t sps)
 {
-    if (feed_mm_min < 1.0f) {
-        feed_mm_min = (float)config_backlash_get_min_speed();
-    }
+    if (sps < 1U) sps = 1U;
+    return (uint32_t)(((uint64_t)sps << 31) / STEP_ISR_FREQ_HZ);
+}
+
+static void bl_reload_sps_cache(void)
+{
+    bl_min_sps_x = config_mm_min_to_sps(AXIS_X, (float)config_backlash_get_min_speed());
+    bl_min_sps_z = config_mm_min_to_sps(AXIS_Z, (float)config_backlash_get_min_speed());
+    bl_max_sps_x = config_mm_min_to_sps(AXIS_X, (float)config_backlash_get_auto_speed());
+    bl_max_sps_z = config_mm_min_to_sps(AXIS_Z, (float)config_backlash_get_auto_speed());
+}
+
+/* feed_sps → bl_inc; clamp [BlMn, BlSp] (как до привязки к feed) */
+static void bl_store_arm_speed(uint8_t axis, uint32_t feed_sps)
+{
+    uint32_t min_sps;
+    uint32_t max_sps;
+    uint32_t sps;
+    uint32_t inc;
+
     if (axis == AXIS_X) {
-        bl_feed_x = feed_mm_min;
+        min_sps = bl_min_sps_x;
+        max_sps = bl_max_sps_x;
     } else {
-        bl_feed_z = feed_mm_min;
+        min_sps = bl_min_sps_z;
+        max_sps = bl_max_sps_z;
+    }
+    sps = feed_sps;
+    if (sps < min_sps) sps = min_sps;
+    if (sps > max_sps) sps = max_sps;
+    inc = bl_calc_increment(sps);
+    if (inc < 1U) inc = 1U;
+
+    if (axis == AXIS_X) {
+        bl_inc_x = inc;
+    } else {
+        bl_inc_z = inc;
+    }
+
+    /* bl_feed — только в main (в ISR без float) */
+    if (SREG & (uint8_t)(1U << 7)) {
+        float spm = config_get_steps_per_mm(axis);
+        float feed_mm_min = (spm >= 1.0f) ? ((float)sps * 60.0f / spm)
+                                          : (float)config_backlash_get_min_speed();
+        if (feed_mm_min < 1.0f) {
+            feed_mm_min = (float)config_backlash_get_min_speed();
+        }
+        if (axis == AXIS_X) {
+            bl_feed_x = feed_mm_min;
+        } else {
+            bl_feed_z = feed_mm_min;
+        }
     }
 }
 
 /* Поставить rem=steps при смене направления (BACKLASH_FIRST_MOVE) */
-static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable, float feed_mm_min)
+static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable, uint32_t feed_sps)
 {
     uint8_t synced = (axis == AXIS_Z) ? synced_z : synced_x;
     uint8_t last_dir = (axis == AXIS_Z) ? last_dir_z : last_dir_x;
@@ -110,7 +162,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable, floa
             case BACKLASH_FIRST_ALWAYS:
                 *rem = steps;
                 *armed_dir = new_dir;
-                bl_store_feed(axis, feed_mm_min);
+                bl_store_arm_speed(axis, feed_sps);
                 bl_log_start(axis, new_dir, steps);
                 return;
             case BACKLASH_FIRST_REF:
@@ -125,7 +177,7 @@ static void backlash_arm_one(uint8_t axis, uint8_t new_dir, uint8_t enable, floa
 
     *rem = steps;
     *armed_dir = new_dir;
-    bl_store_feed(axis, feed_mm_min);
+    bl_store_arm_speed(axis, feed_sps);
     bl_log_start(axis, new_dir, steps);
 }
 
@@ -169,12 +221,16 @@ void backlash_queue_takeup(uint8_t axis, uint8_t dir, int32_t steps)
         armed_dir_z = dir;
     }
     *rem = steps;
+    bl_store_arm_speed(axis, (axis == AXIS_X) ? bl_min_sps_x : bl_min_sps_z);
     bl_log_start(axis, dir, steps);
 }
 
 void backlash_reload_steps(void)
 {
     backlash_load_steps_from_config();
+    bl_reload_sps_cache();
+    bl_inc_x = bl_calc_increment(bl_min_sps_x);
+    bl_inc_z = bl_calc_increment(bl_min_sps_z);
     DBG_INFO_VAL("MOT", "BL", "Xstp", (uint32_t)backlash_steps_x);
     DBG_INFO_VAL("MOT", "BL", "Zstp", (uint32_t)backlash_steps_z);
 }
@@ -182,6 +238,7 @@ void backlash_reload_steps(void)
 void backlash_init(void)
 {
     backlash_load_steps_from_config();
+    bl_reload_sps_cache();
     DBG_INFO_VAL("MOT", "BL", "Xstp", (uint32_t)backlash_steps_x);
     DBG_INFO_VAL("MOT", "BL", "Zstp", (uint32_t)backlash_steps_z);
 
@@ -195,6 +252,8 @@ void backlash_init(void)
     armed_dir_z = BACKLASH_REF_DIR_Z;
     bl_feed_x = 0.0f;
     bl_feed_z = 0.0f;
+    bl_inc_x = bl_calc_increment(bl_min_sps_x);
+    bl_inc_z = bl_calc_increment(bl_min_sps_z);
     bl_log_w = 0;
     bl_log_r = 0;
 }
@@ -223,13 +282,23 @@ void backlash_unsync_axis(uint8_t axis)
     }
 }
 
-void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable, float feed_mm_min)
+void backlash_arm_axis(uint8_t axis, uint8_t new_dir, uint8_t enable, uint32_t feed_sps)
 {
     if (axis == AXIS_X) {
-        backlash_arm_one(AXIS_X, new_dir, enable, feed_mm_min);
+        backlash_arm_one(AXIS_X, new_dir, enable, feed_sps);
     } else {
-        backlash_arm_one(AXIS_Z, new_dir, enable, feed_mm_min);
+        backlash_arm_one(AXIS_Z, new_dir, enable, feed_sps);
     }
+}
+
+uint32_t backlash_get_arm_inc(uint8_t axis)
+{
+    uint32_t inc = (axis == AXIS_X) ? bl_inc_x : bl_inc_z;
+
+    if (inc < 1U) {
+        inc = bl_calc_increment((axis == AXIS_X) ? bl_min_sps_x : bl_min_sps_z);
+    }
+    return inc;
 }
 
 float backlash_get_arm_feed_mm_min(uint8_t axis)
