@@ -20,7 +20,7 @@
 #define LCD_UPDATE_MS 80          /* период обновления дисплея */
 #define POT_READ_MS 100           /* период опроса потенциометра */
 
-#define DEBUG_ENABLED 0
+#define DEBUG_ENABLED 1
 
 #define DEBUG_LEVEL_ERROR   0
 #define DEBUG_LEVEL_WARNING 1

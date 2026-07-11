@@ -71,6 +71,7 @@ typedef struct {
     char mark_z;
     long hand;
     uint16_t pot_filtered;
+    uint8_t bl_auto;
 } LcdMainCache_t;
 
 static LcdMainCache_t lcd_cache;
@@ -205,27 +206,61 @@ static void lcd_format_axis_field(char *dst, char axis, int32_t steps, char mark
     dst[10] = 0;
 }
 
-static void lcd_format_mpg_line(char axis, long hand) {
-    int n;
+/* Символ режима люфта в col 19: '-' выкл, 'K' вкл (BlAu). */
+static char lcd_backlash_flag(void) {
+    if (backlash_enabled() && config_backlash_get_auto_on()) {
+        return 'K';
+    }
+    return '-';
+}
+
+/* Строка 2 LCD: MPG в единицах CrdU, 20 символов без \0 внутри. */
+static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id) {
+    uint8_t units = config_get_coord_units();
+    char num[8];
 
     memset(lcd_mpg, ' ', LCD_COLS);
-    n = snprintf(lcd_mpg, LCD_COLS, "MPG %c %+ld", axis, hand);
-    if (n < 0) {
-        n = 0;
+    memcpy(lcd_mpg, "MPG ", 4);
+    lcd_mpg[4] = axis;
+
+    if (units == COORD_UNIT_STEPS) {
+        if (hand < 0) {
+            lcd_mpg[5] = '-';
+            snprintf(num, sizeof(num), "%07ld", -(long)hand);
+        } else {
+            lcd_mpg[5] = ' ';
+            snprintf(num, sizeof(num), "%07ld", (long)hand);
+        }
+        memcpy(lcd_mpg + 6, num, 7);
+    } else {
+        uint32_t whole;
+        uint32_t frac;
+        int8_t neg;
+
+        lcd_steps_to_parts(hand, axis_id, units, &whole, &frac, &neg);
+        lcd_format_decimal_num(num, whole, frac);
+        lcd_mpg[5] = (neg < 0) ? '-' : ' ';
+        memcpy(lcd_mpg + 6, num, 7);
     }
-    if ((uint8_t)n < LCD_COLS) {
-        lcd_mpg[n] = ' ';
-    }
-    lcd_mpg[LCD_COLS - 1] = config_coord_unit_flag();
+
+    lcd_mpg[LCD_COLS - 2] = config_coord_unit_flag();
+    lcd_mpg[LCD_COLS - 1] = lcd_backlash_flag();
     lcd_mpg[LCD_COLS] = 0;
 }
 
+/* Строка 4 LCD: X/Z по 10 символов, хвост пробелами — без \0 внутри 20 байт. */
 static void lcd_format_coords_line(char *buf, size_t len) {
     int32_t xs = motion_get_pos_steps(AXIS_X);
     int32_t zs = motion_get_pos_steps(AXIS_Z);
     lcd_format_axis_field(lcd_xf, 'X', xs, limits_lcd_marker(AXIS_X));
     lcd_format_axis_field(lcd_zf, 'Z', zs, limits_lcd_marker(AXIS_Z));
-    snprintf(buf, len, "%s%s", lcd_xf, lcd_zf);
+    if (len <= LCD_COLS) {
+        return;
+    }
+    memset(buf, ' ', LCD_COLS);
+    memcpy(buf, lcd_xf, 10);
+    memcpy(buf + 10, lcd_zf, 10);
+    buf[LCD_COLS] = 0;
 }
 
 static char lcd_feed_txt[16];
@@ -239,7 +274,8 @@ static void update_divider_lcd(void) {
         ui_lcd_set_line(0, "BL takeup...        ");
         memset(lcd_line, ' ', LCD_COLS);
         memcpy(lcd_line, "Wait", 4);
-        lcd_line[LCD_COLS - 1] = config_coord_unit_flag();
+        lcd_line[LCD_COLS - 2] = config_coord_unit_flag();
+        lcd_line[LCD_COLS - 1] = lcd_backlash_flag();
         lcd_line[LCD_COLS] = 0;
         ui_lcd_set_line_raw(1, lcd_line);
         mode_divider_format_line2(lcd_div_line2, sizeof(lcd_div_line2));
@@ -274,7 +310,8 @@ static void update_main_lcd(void) {
         ui_lcd_set_line(0, "BL takeup...        ");
         memset(lcd_line, ' ', LCD_COLS);
         memcpy(lcd_line, "Wait", 4);
-        lcd_line[LCD_COLS - 1] = config_coord_unit_flag();
+        lcd_line[LCD_COLS - 2] = config_coord_unit_flag();
+        lcd_line[LCD_COLS - 1] = lcd_backlash_flag();
         lcd_line[LCD_COLS] = 0;
         ui_lcd_set_line_raw(1, lcd_line);
         ui_lcd_clear_line(2);
@@ -295,7 +332,7 @@ static void update_main_lcd(void) {
     ui_lcd_set_line(0, lcd_line);
 
     char axis = (sw.mpg_axis == AXIS_X) ? 'X' : 'Z';
-    lcd_format_mpg_line(axis, (long)motion_jog_get_hand(sw.mpg_axis));
+    lcd_format_mpg_line(axis, motion_jog_get_hand(sw.mpg_axis), sw.mpg_axis);
     ui_lcd_set_line_raw(1, lcd_mpg);
     ui_lcd_clear_line(2);
 
@@ -329,6 +366,7 @@ static void lcd_cache_save_main(void) {
     lcd_cache.mark_z = limits_lcd_marker(AXIS_Z);
     lcd_cache.hand = (long)motion_jog_get_hand(sw.mpg_axis);
     lcd_cache.pot_filtered = ui_pot_get_value();
+    lcd_cache.bl_auto = config_backlash_get_auto_on();
 }
 
 /* Дешёвая проверка: форматировать только при изменении данных LCD. */
@@ -364,7 +402,8 @@ static void lcd_mark_dirty_if_changed(void) {
         mx != lcd_cache.mark_x ||
         mz != lcd_cache.mark_z ||
         hand != lcd_cache.hand ||
-        pot != lcd_cache.pot_filtered) {
+        pot != lcd_cache.pot_filtered ||
+        config_backlash_get_auto_on() != lcd_cache.bl_auto) {
         lcd_dirty = 1;
     }
 

@@ -70,7 +70,7 @@
 #define COORD_UNIT_STEPS              0
 #define COORD_UNIT_MM                 1
 #define COORD_UNIT_INCH               2
-#define COORD_UNIT_DEFAULT            COORD_UNIT_STEPS
+#define COORD_UNIT_DEFAULT            COORD_UNIT_MM
 
 /* --- Телеметрия --- */
 #define TELEMETRY_BUFFER_SIZE 64

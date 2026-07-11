@@ -510,6 +510,20 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
     joy_x_on = x_on;
 
     if (!z_on && !x_on) {
+        if (was_z_on) {
+            mpg_cmd[AXIS_Z] = dds_get_position(AXIS_Z);
+            if (mpg_axis_last == AXIS_Z) {
+                mpg_dir_lock = 0;
+                mpg_rev_cnt = 0;
+            }
+        }
+        if (was_x_on) {
+            mpg_cmd[AXIS_X] = dds_get_position(AXIS_X);
+            if (mpg_axis_last == AXIS_X) {
+                mpg_dir_lock = 0;
+                mpg_rev_cnt = 0;
+            }
+        }
         if ((was_z_on || was_x_on) && !mpg_active) {
             planner_jog_stop();
         }
