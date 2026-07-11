@@ -37,6 +37,7 @@ typedef struct {
 void ui_buttons_init(void);
 void ui_buttons_poll(void);
 void ui_buttons_reset_joy(void);
+void ui_buttons_reset_menu(void);
 ButtonState_t ui_buttons_get_state(void);
 ButtonClicks_t ui_buttons_get_clicks(void);
 uint8_t ui_buttons_feed_joy_click(void);

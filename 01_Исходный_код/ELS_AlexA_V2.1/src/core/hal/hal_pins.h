@@ -120,7 +120,7 @@
 #define LIMIT_UP_PIN    LIMIT_FRONT_PIN
 #define LIMIT_DOWN_PIN  LIMIT_REAR_PIN
 
-#define ESTOP_BTN_PIN     BTN_SELECT_PIN
+#define ESTOP_BTN_PIN     40
 #define SPINDLE_PWM_PIN   6
 #define COOLANT_PIN       17
 

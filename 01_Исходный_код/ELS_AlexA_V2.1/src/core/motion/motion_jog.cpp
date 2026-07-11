@@ -386,6 +386,7 @@ void motion_jog_resume(void) {
     dds_set_target(AXIS_X, dds_get_position(AXIS_X));
     dds_set_target(AXIS_Z, dds_get_position(AXIS_Z));
     (void)ui_encoder_get_mpg_delta();
+    DBG_INFO("JOG", "JOY", "resume");
 }
 
 static void motion_jog_limit_poll(void) {  /* сопровождение go_lim до цели */
@@ -439,8 +440,13 @@ static void motion_jog_limit_poll(void) {  /* сопровождение go_lim 
 void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise jog */
     int32_t tx;
     int32_t tz;
+    static uint8_t joy_run = 0;
 
     if (estop_is_triggered()) {
+        if (joy_run) {
+            DBG_INFO("JOG", "JOY", "blk estop");
+            joy_run = 0;
+        }
         go_lim_active = 0;
         go_lim_latch = 0;
         go_lim_joy_arm = 0;
@@ -448,7 +454,13 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
     }
 
     motion_jog_limit_poll();
-    if (go_lim_active) return;
+    if (go_lim_active) {
+        if (joy_run) {
+            DBG_INFO("JOG", "JOY", "blk golim");
+            joy_run = 0;
+        }
+        return;
+    }
     if (go_lim_stop_joy) {
         go_lim_stop_joy = 0;
         return;
@@ -468,6 +480,15 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
     uint8_t x_on = (x_sign != 0);
     uint8_t was_z_on = joy_z_on;
     uint8_t was_x_on = joy_x_on;
+    uint8_t joy_any = (uint8_t)(z_on | x_on);
+
+    if (joy_any && !joy_run) {
+        DBG_INFO_VAL("UI", "JOY", "run", (uint32_t)((z_sign + 2) | ((x_sign + 2) << 2)));
+        joy_run = 1;
+    } else if (!joy_any && joy_run) {
+        DBG_INFO("JOG", "JOY", "idle");
+        joy_run = 0;
+    }
 
     if (z_on && !was_z_on) hand_reset_axis(AXIS_Z);
     if (x_on && !was_x_on) hand_reset_axis(AXIS_X);

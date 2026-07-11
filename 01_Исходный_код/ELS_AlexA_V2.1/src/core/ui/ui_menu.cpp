@@ -11,6 +11,8 @@
 #include "../motion/backlash.h"
 #include "../motion/planner.h"
 #include "../motion/motion_jog.h"
+#include "../fsm/fsm_core.h"
+#include "../process/estop_control.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
@@ -518,16 +520,31 @@ static uint8_t menu_cooldown_ok(void) {
     return (millis() - menu_cooldown_ms) >= MENU_COOLDOWN_MS;
 }
 
+/* mst: b0 act b1 mode b2 pend b3 selDn b4 selLng b5 selPin */
+static void menu_trace(const char *evt) {
+    uint32_t mst = (uint32_t)menu_active
+                 | ((uint32_t)menu_mode << 1)
+                 | ((uint32_t)menu_pending_save << 2)
+                 | ((uint32_t)sel_down << 3)
+                 | ((uint32_t)sel_long_fired << 4)
+                 | ((uint32_t)ui_buttons_get_state().select << 5);
+    DBG_INFO("UI", "MENU", evt);
+    DBG_INFO_VAL("UI", "MENU", "mst", mst);
+    DBG_INFO_VAL("UI", "MENU", "idx", param_idx);
+    DBG_INFO_VAL("UI", "MENU", "fsm", (uint32_t)fsm_get_state());
+}
+
 static void menu_open(void) {
     menu_active = 1;
     menu_mode = MENU_MODE_BROWSE;
     param_idx = 0;
     menu_load_values();
     menu_cooldown_ms = millis();
-    DBG_INFO("UI", "MENU", "open");
+    menu_trace("open");
 }
 
 static void menu_save_all(void) {
+    menu_trace("save start");
     if (edit_async_min > edit_async_max) {
         uint16_t t = edit_async_min;
         edit_async_min = edit_async_max;
@@ -573,23 +590,31 @@ static void menu_save_all(void) {
 
     config_set_buzzer_on(edit_buzzer);
     config_save();
+    menu_trace("save done");
 }
 
 static void menu_exit(void) {
     menu_active = 0;
     menu_mode = MENU_MODE_BROWSE;
+    sel_down = 0;
+    sel_long_fired = 0;
     ui_lcd_clear_cursor();
     planner_stop_all();
+    ui_buttons_reset_menu();
     ui_buttons_reset_joy();
     motion_jog_resume();
+    if (estop_is_triggered()) {
+        estop_reset();
+    }
     menu_cooldown_ms = millis();
-    DBG_INFO("UI", "MENU", "exit");
+    menu_trace("exit");
 }
 
 static void menu_enter_edit(void) {
     menu_mode = MENU_MODE_EDIT;
     menu_value_to_edit_buf(param_idx);
     menu_edit_find_first_digit();
+    menu_trace("edit");
 }
 
 static void menu_confirm_edit(void) {
@@ -598,6 +623,7 @@ static void menu_confirm_edit(void) {
     ui_lcd_clear_cursor();
     menu_cooldown_ms = millis();
     ui_buzzer_beep();
+    menu_trace("confirm");
 }
 
 static void menu_poll_select(void) {
@@ -610,17 +636,21 @@ static void menu_poll_select(void) {
             sel_down = 1;
             sel_ms = now;
             sel_long_fired = 0;
+            menu_trace("sel dn");
         } else if (!sel_long_fired && (now - sel_ms) >= MENU_SEL_HOLD_MS) {
             sel_long_fired = 1;
             if (!menu_active) {
                 if (menu_cooldown_ok()) {
                     menu_open();
+                } else {
+                    menu_trace("open cd");
                 }
             } else if (menu_mode == MENU_MODE_EDIT) {
                 menu_confirm_edit();
             } else {
                 menu_pending_save = 1;
                 ui_buzzer_beep();
+                menu_trace("save req");
                 menu_exit();
             }
         }
@@ -632,6 +662,8 @@ static void menu_poll_select(void) {
          * при удержании >= EB_HOLD_TIME (600 ms) не даёт click(). */
         if (!sel_long_fired && menu_active && menu_mode == MENU_MODE_BROWSE) {
             menu_enter_edit();
+        } else {
+            menu_trace("sel up");
         }
         sel_down = 0;
         sel_long_fired = 0;
@@ -642,10 +674,24 @@ static void menu_poll_select(void) {
 }
 
 void ui_menu_poll(void) {
+    static uint8_t save_wait_log = 0;
+
+    /* EEPROM блокирует loop: сохраняем только после отпускания Select. */
     if (!menu_active && menu_pending_save) {
-        menu_pending_save = 0;
-        menu_save_all();
-        ui_buttons_reset_joy();
+        if (ui_buttons_get_state().select) {
+            if (!save_wait_log) {
+                menu_trace("save wait");
+                save_wait_log = 1;
+            }
+        } else {
+            save_wait_log = 0;
+            menu_pending_save = 0;
+            menu_save_all();
+            ui_buttons_reset_menu();
+            ui_buttons_reset_joy();
+        }
+    } else {
+        save_wait_log = 0;
     }
 
     menu_poll_select();

@@ -6,6 +6,7 @@
 #include "../motion/motion_jog.h"
 #include "../motion/planner.h"
 #include "../process/estop_control.h"
+#include "../ui/ui_buttons.h"
 #include "../ui/ui_switches.h"
 #include "../../config/config.h"
 #include "../../modes/mode_async/mode_async.h"
@@ -98,12 +99,19 @@ void fsm_manager_poll(void) {
 
 void fsm_manager_process(void) {
     State_t st;
+    static uint8_t blk_startup_log = 0;
+    static uint8_t blk_state_log = 0;
 
     planner_process();
 
     if (planner_startup_busy()) {
+        if (!blk_startup_log && ui_buttons_feed_joy_on()) {
+            DBG_INFO("FSM", "JOG", "blk startup");
+            blk_startup_log = 1;
+        }
         return;
     }
+    blk_startup_log = 0;
 
     st = fsm_get_state();
 
@@ -112,8 +120,12 @@ void fsm_manager_process(void) {
     }
 
     if (st == STATE_MANUAL) {
+        blk_state_log = 0;
         motion_jog_joy_poll();
         motion_jog_poll();
+    } else if (ui_buttons_feed_joy_on() && !blk_state_log) {
+        DBG_INFO_VAL("FSM", "JOG", "blk state", (uint32_t)st);
+        blk_state_log = 1;
     }
 
     switch (current_mode) {

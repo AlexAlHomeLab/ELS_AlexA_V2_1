@@ -71,4 +71,5 @@ void hal_init(void) {
     hal_pin_input(LIMIT_FRONT_PIN);
     hal_pin_input(LIMIT_RIGHT_PIN);
     hal_pin_input(LIMIT_REAR_PIN);
+    hal_pin_input(ESTOP_BTN_PIN);
 }

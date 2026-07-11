@@ -28,6 +28,25 @@ static ButtonT<LIMIT_REAR_PIN> btn_limit_rear;
 static ButtonState_t btn_state;
 static ButtonClicks_t btn_clicks;
 static uint8_t feed_joy_click_flag;
+static uint8_t joy_trace_mask = 0;
+
+static uint8_t joy_read_mask(void) {
+    uint8_t m = 0;
+    if (btn_joy_left.read()) m |= 1U;
+    if (btn_joy_right.read()) m |= 2U;
+    if (btn_joy_up.read()) m |= 4U;
+    if (btn_joy_down.read()) m |= 8U;
+    if (btn_joy_rapid.read()) m |= 16U;
+    return m;
+}
+
+static void joy_trace_poll(void) {
+    uint8_t m = joy_read_mask();
+    if (m != joy_trace_mask) {
+        DBG_INFO_VAL("UI", "JOY", "mask", m);
+        joy_trace_mask = m;
+    }
+}
 
 static void set_btn_level(VirtButton &btn) {
     btn.setBtnLevel(LOW);
@@ -195,6 +214,8 @@ void ui_buttons_poll(void) {
     btn_state.limit_front = btn_limit_front.pressing();
     btn_state.limit_right = btn_limit_right.pressing();
     btn_state.limit_rear = btn_limit_rear.pressing();
+
+    joy_trace_poll();
 }
 
 ButtonState_t ui_buttons_get_state(void) {
@@ -220,4 +241,15 @@ void ui_buttons_reset_joy(void) {
     btn_joy_up.reset();
     btn_joy_down.reset();
     btn_joy_rapid.reset();
+    joy_trace_mask = joy_read_mask();
+    DBG_INFO_VAL("UI", "JOY", "rst", joy_trace_mask);
+}
+
+void ui_buttons_reset_menu(void) {
+    btn_left.reset();
+    btn_right.reset();
+    btn_up.reset();
+    btn_down.reset();
+    btn_select.reset();
+    DBG_INFO("UI", "BTN", "rst menu");
 }
