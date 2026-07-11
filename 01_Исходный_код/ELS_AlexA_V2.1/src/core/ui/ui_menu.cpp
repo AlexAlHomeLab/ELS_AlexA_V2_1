@@ -7,7 +7,7 @@
 #include "../../config/config_display.h"
 #include "../../config/config_storage.h"
 #include "../debug/debug_serial.h"
-#include "../hal/hal_pins.h"
+#include "../hal/hal_buzzer.h"
 #include "../motion/backlash.h"
 #include "../motion/planner.h"
 #include "../motion/motion_jog.h"
@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MENU_PARAM_COUNT 27
+#define MENU_PARAM_COUNT 28
 #define MENU_EDIT_LEN 8
 
 #define MENU_MODE_BROWSE 0
@@ -70,6 +70,7 @@ typedef enum {
     PTYPE_CENTS = 1,
     PTYPE_USTEP = 2,
     PTYPE_BOOL = 3,
+    PTYPE_ACTION = 4,
 } ParamType_t;
 
 typedef struct {
@@ -107,11 +108,12 @@ static const ParamDef_t param_def[MENU_PARAM_COUNT] = {
     {"BlMn", PTYPE_UINT, BACKLASH_MIN_SPEED_MIN, BACKLASH_MIN_SPEED_MAX},
     {"Jdec", PTYPE_UINT, JOG_DECEL_STEPS_MIN, JOG_DECEL_STEPS_MAX},
     {"CrdU", PTYPE_UINT, 0, 2},
+    {"dEFt", PTYPE_ACTION, 0, 0},
 };
 
 static void ui_buzzer_beep(void) {
     if (!edit_buzzer) return;
-    tone(BUZZER_PIN, 2500, 40);
+    hal_buzzer_beep_ms(40);
 }
 
 static uint16_t *menu_param_ptr_u16(uint8_t idx) {
@@ -448,7 +450,9 @@ static void menu_format_list_line(uint8_t idx, char *buf, size_t len) {
     } else {
         uint16_t v = menu_param_get_u16(idx);
 
-        if (d->type == PTYPE_CENTS) {
+        if (d->type == PTYPE_ACTION) {
+            snprintf(val, sizeof(val), "RUN");
+        } else if (d->type == PTYPE_CENTS) {
             snprintf(val, sizeof(val), "%u.%02u", (unsigned)(v / 100U), (unsigned)(v % 100U));
         } else if (d->type == PTYPE_BOOL) {
             snprintf(val, sizeof(val), "%s", v ? "ON" : "OFF");
@@ -617,6 +621,23 @@ static void menu_enter_edit(void) {
     menu_trace("edit");
 }
 
+static void menu_factory_reset(void) {
+    config_factory_reset();
+    backlash_reload_steps();
+    menu_load_values();
+    menu_cooldown_ms = millis();
+    hal_buzzer_beep_double_ms(40, 80);
+    menu_trace("factory");
+}
+
+static void menu_try_enter_edit(void) {
+    if (param_def[param_idx].type == PTYPE_ACTION) {
+        menu_factory_reset();
+        return;
+    }
+    menu_enter_edit();
+}
+
 static void menu_confirm_edit(void) {
     menu_edit_buf_to_value(param_idx);
     menu_mode = MENU_MODE_BROWSE;
@@ -661,7 +682,7 @@ static void menu_poll_select(void) {
         /* Короткое отпускание: edit. Не полагаемся на cl.select — EncButton
          * при удержании >= EB_HOLD_TIME (600 ms) не даёт click(). */
         if (!sel_long_fired && menu_active && menu_mode == MENU_MODE_BROWSE) {
-            menu_enter_edit();
+            menu_try_enter_edit();
         } else {
             menu_trace("sel up");
         }
@@ -669,7 +690,7 @@ static void menu_poll_select(void) {
         sel_long_fired = 0;
     } else if (cl.select && menu_active && menu_mode == MENU_MODE_BROWSE) {
         /* Короткий клик, если нажатие не попало в poll (sel_down не успел). */
-        menu_enter_edit();
+        menu_try_enter_edit();
     }
 }
 

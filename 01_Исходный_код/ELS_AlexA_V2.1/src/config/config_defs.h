@@ -16,10 +16,15 @@
 
 /* --- Инверсия DIR (0/1), значение по умолчанию --- */
 #ifndef AXIS_X_DIR_INVERT_DEFAULT
-#define AXIS_X_DIR_INVERT_DEFAULT 0
+#define AXIS_X_DIR_INVERT_DEFAULT 1   /* джойстик X: реверс DIR */
 #endif
 #ifndef AXIS_Z_DIR_INVERT_DEFAULT
 #define AXIS_Z_DIR_INVERT_DEFAULT 0
+#endif
+
+/* Инверсия знака тика РГИ (не меняет dir_invert мотора) */
+#ifndef MPG_AXIS_Z_INVERT
+#define MPG_AXIS_Z_INVERT 1           /* РГИ Z: программный реверс */
 #endif
 
 /* --- FSM: коды ошибок и тип цикла --- */
@@ -52,7 +57,7 @@
 #define BACKLASH_FIRST_REF      2
 #define BACKLASH_FIRST_MOVE     BACKLASH_FIRST_ALWAYS
 /* Дистанция выборки по умолчанию (импульсы); EEPROM переопределяет */
-#define BACKLASH_X_STEPS_DEFAULT    100
+#define BACKLASH_X_STEPS_DEFAULT    1010
 #define BACKLASH_Z_STEPS_DEFAULT    100
 #define BACKLASH_X_CENTIMM            34
 #define BACKLASH_Z_CENTIMM            46

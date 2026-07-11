@@ -3,9 +3,9 @@
 #include "motion_jog.h"
 #include "stepper_gen.h"
 #include "../debug/debug_serial.h"
+#include "../hal/hal_buzzer.h"
 #include "../hal/hal_pins.h"
 #include "../../config/config.h"
-#include "../../config/config_storage.h"
 #include <Arduino.h>
 
 #define LIMIT_OFF_MIN (-2000000L)  /* лимит не задан — мин. граница */
@@ -21,17 +21,13 @@ static uint8_t limit_active[4];  /* 1 — лимит установлен */
 static int32_t limit_pos[4];     /* координата лимита, шаги */
 
 static void limit_beep(void) {
-    if (!config_get_buzzer_on()) return;
-    tone(BUZZER_PIN, 2500, 40);
+    hal_buzzer_beep_ms(40);
 }
 
 static void limit_beep_double(void) {
-    if (!config_get_buzzer_on()) return;
-    tone(BUZZER_PIN, 2500, 40);
+    hal_buzzer_beep_ms(40);
     delay(45);
-    noTone(BUZZER_PIN);
-    delay(80);
-    tone(BUZZER_PIN, 2500, 40);
+    hal_buzzer_beep_ms(40);
 }
 
 static uint8_t limit_idx_to_axis(uint8_t idx) {

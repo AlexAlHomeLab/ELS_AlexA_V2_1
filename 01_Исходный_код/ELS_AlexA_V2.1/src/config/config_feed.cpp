@@ -118,6 +118,12 @@ void config_feed_save(void) {
     DBG_INFO("CFG", "FEED", "saved");
 }
 
+void config_feed_factory_reset(void) {
+    feed_cfg_apply_defaults();
+    feed_cfg_write_eeprom();
+    DBG_INFO("CFG", "FEED", "factory");
+}
+
 uint16_t config_feed_get_min_raw(FeedRangeId_t range) {
     if (range >= CONFIG_FEED_RANGE_COUNT) range = FEED_RANGE_ASYNC;
     return feed_ranges[range].min_raw;

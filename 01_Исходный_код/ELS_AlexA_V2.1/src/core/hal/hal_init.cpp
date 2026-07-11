@@ -1,4 +1,5 @@
 #include "hal_init.h"
+#include "hal_buzzer.h"
 #include "hal_pins.h"
 
 static void hal_pin_input(uint8_t pin) {
@@ -22,7 +23,7 @@ void hal_init(void) {
     hal_pin_output_low(STEP_Z_PIN);
     hal_pin_output_low(DIR_Z_PIN);
 
-    hal_pin_output_low(BUZZER_PIN);
+    hal_buzzer_init();
     hal_pin_output_high(LED_TACHO_PIN);
     hal_pin_output_high(LED_LIMIT_LEFT_PIN);
     hal_pin_output_high(LED_LIMIT_FRONT_PIN);

@@ -115,6 +115,12 @@ void config_backlash_save(void) {
     DBG_INFO("CFG", "BL", "saved");
 }
 
+void config_backlash_factory_reset(void) {
+    bl_cfg_apply_defaults();
+    bl_cfg_write_eeprom();
+    DBG_INFO("CFG", "BL", "factory");
+}
+
 uint8_t config_backlash_get_auto_on(void) {
     return bl_cfg.auto_on;
 }

@@ -116,6 +116,12 @@ void config_machine_save(void) {
     DBG_INFO("CFG", "MACH", "saved");
 }
 
+void config_machine_factory_reset(void) {
+    machine_cfg_apply_defaults();
+    machine_cfg_write_eeprom();
+    DBG_INFO("CFG", "MACH", "factory");
+}
+
 float config_get_steps_per_mm(uint8_t axis) {
     const AxisCfgRaw_t *a = axis_cfg(axis);
     return (float)a->motor_steps * (float)a->microstep / ((float)a->screw_pitch * 0.01f);

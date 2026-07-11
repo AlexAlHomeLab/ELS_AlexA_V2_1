@@ -13,6 +13,8 @@
 #include "../ui/ui_encoder.h"
 #include "../ui/ui_pot.h"
 #include "../ui/ui_switches.h"
+#include "../fsm/fsm_manager.h"
+#include "../../config/config_feed.h"
 
 #include <Arduino.h>
 
@@ -71,6 +73,20 @@ static void hand_reset_axis(uint8_t axis) {
 }
 
 /* Шаги за один тик РГИ: scale 1 = 0.01 мм, rapid = 0.1 мм */
+static int8_t mpg_adjust_tick_sign(uint8_t axis, int8_t tick_sign) {
+    if (tick_sign == 0) return 0;
+    /* X: компенсация dir_invert — РГИ X без изменения направления */
+    if (axis == AXIS_X && config_get_dir_invert(AXIS_X)) {
+        tick_sign = (int8_t)(-tick_sign);
+    }
+#if MPG_AXIS_Z_INVERT
+    if (axis == AXIS_Z) {
+        tick_sign = (int8_t)(-tick_sign);
+    }
+#endif
+    return tick_sign;
+}
+
 static int32_t jog_steps_from_delta(uint8_t axis, int32_t delta, uint8_t mpg_scale, uint8_t rapid) {
     int32_t spm;
     int32_t step;
@@ -96,14 +112,27 @@ static int32_t jog_steps_from_delta(uint8_t axis, int32_t delta, uint8_t mpg_sca
 
 static float jog_speed_mm_min(uint8_t axis, uint8_t rapid) {  /* pot или rapid_speed */
     float mm_min;
+    FeedUnit_t unit;
 
     if (rapid) {
         mm_min = (float)config_get_rapid_speed_mm_min(axis);
     } else {
         mm_min = ui_pot_get_jog_mm_min();
-        if (mm_min < 10.0f) mm_min = 10.0f;
-        float cap = (float)config_get_max_speed_mm_min(axis);
-        if (mm_min > cap) mm_min = cap;
+        unit = config_feed_get_unit(fsm_manager_get_mode());
+        /* sync: мм/об × rpm даёт малые мм/мин — не поднимать до 10 как в async */
+        if (unit == FEED_UNIT_MM_REV) {
+            if (mm_min < 1.0f) {
+                mm_min = 1.0f;
+            }
+        } else if (mm_min < 10.0f) {
+            mm_min = 10.0f;
+        }
+        {
+            float cap = (float)config_get_max_speed_mm_min(axis);
+            if (mm_min > cap) {
+                mm_min = cap;
+            }
+        }
     }
     return mm_min;
 }
@@ -692,6 +721,7 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
             peek_d = ui_encoder_peek_mpg_delta();
             if (peek_d == 0) break;
             tick_sign = (peek_d > 0) ? 1 : -1;
+            tick_sign = mpg_adjust_tick_sign(axis, tick_sign);
 
             if (lock_sign == 0) {
                 lock_sign = tick_sign;

@@ -60,6 +60,12 @@ void config_display_save(void) {
     DBG_INFO("CFG", "DSP", "saved");
 }
 
+void config_display_factory_reset(void) {
+    coord_units = COORD_UNIT_DEFAULT;
+    config_display_save();
+    DBG_INFO("CFG", "DSP", "factory");
+}
+
 uint8_t config_get_coord_units(void) {
     return coord_units;
 }

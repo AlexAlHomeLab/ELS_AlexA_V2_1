@@ -1,6 +1,7 @@
 #include "estop_control.h"
 #include "../debug/debug_serial.h"
 #include "../fsm/fsm_core.h"
+#include "../hal/hal_buzzer.h"
 #include "../hal/hal_pins.h"
 #include "../motion/motion_control.h"
 #include "../motion/planner.h"
@@ -22,12 +23,7 @@ void estop_trigger(void) {
     fsm_force_error();
     analogWrite(SPINDLE_PWM_PIN, 0);
     DBG_INFO("SYS", "ESTOP", "trigger");
-    for (int i = 0; i < 5; i++) {
-        digitalWrite(BUZZER_PIN, HIGH);
-        delay(100);
-        digitalWrite(BUZZER_PIN, LOW);
-        delay(100);
-    }
+    hal_buzzer_estop_signal();
 }
 
 void estop_reset(void) {

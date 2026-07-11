@@ -19,8 +19,8 @@ extern "C" {
 /* --- Диапазоны потенциометра (заводские, EEPROM) --- */
 #define CONFIG_FEED_ASYNC_MIN_DEFAULT   20    /* мм/мин */
 #define CONFIG_FEED_ASYNC_MAX_DEFAULT   400   /* мм/мин */
-#define CONFIG_FEED_SYNC_MIN_DEFAULT    2     /* x100: 0.02 мм/об */
-#define CONFIG_FEED_SYNC_MAX_DEFAULT    20    /* x100: 0.20 мм/об */
+#define CONFIG_FEED_SYNC_MIN_DEFAULT    1     /* x100: 0.01 мм/об (7e2 MIN_FEED) */
+#define CONFIG_FEED_SYNC_MAX_DEFAULT    60    /* x100: 0.60 мм/об (7e2 MAX_FEED) */
 #define CONFIG_FEED_SYNC_RAW_SCALE      0.01f /* мм/об на единицу raw */
 #define CONFIG_FEED_ASYNC_QUANT_STEP    10    /* шаг квантования мм/мин */
 #define CONFIG_FEED_ASYNC_QUANT_SPAN    50    /* мин. размах для квантования */
@@ -48,6 +48,7 @@ typedef enum {
 
 void config_feed_load(void);
 void config_feed_save(void);
+void config_feed_factory_reset(void);
 
 uint8_t config_feed_uses_pot(uint8_t mode);       /* 0 для Thread */
 FeedUnit_t config_feed_get_unit(uint8_t mode);

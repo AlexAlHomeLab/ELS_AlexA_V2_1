@@ -1,5 +1,6 @@
 #include "mode_sync.h"
 #include "../../core/ui/ui_lcd.h"
+#include "../../core/ui/ui_pot.h"
 #include "../../core/motion/planner.h"
 #include "../../core/motion/stepper_gen.h"
 #include "../../core/process/spindle_control.h"
@@ -26,7 +27,11 @@ void mode_sync_exit(void) {
 
 void mode_sync_process(void) {
     char buf[LCD_COLS + 1];
-    if (!mode_active) return;
+    if (!mode_active) {
+        return;
+    }
+
+    feed_per_rev = ui_pot_get_feed_mm_rev();
 
     uint32_t rpm = spindle_get_rpm();
     if (rpm == 0) {

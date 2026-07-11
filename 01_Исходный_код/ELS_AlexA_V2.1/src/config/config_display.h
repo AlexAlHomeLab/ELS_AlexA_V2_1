@@ -11,6 +11,7 @@ extern "C" {
 
 void config_display_load(void);
 void config_display_save(void);
+void config_display_factory_reset(void);
 
 uint8_t config_get_coord_units(void);  /* COORD_UNIT_* */
 void config_set_coord_units(uint8_t units);

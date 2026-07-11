@@ -80,6 +80,10 @@ float ui_pot_get_feed_value(uint8_t mode) {
     return config_feed_map_adc(mode, pot_filtered);
 }
 
+float ui_pot_get_feed_mm_rev(void) {
+    return ui_pot_get_feed_value(CONFIG_FEED_MODE_SYNC);
+}
+
 float ui_pot_get_jog_mm_min(void) {
     uint8_t mode = fsm_manager_get_mode();
     FeedUnit_t unit = config_feed_get_unit(mode);
@@ -94,7 +98,9 @@ float ui_pot_get_jog_mm_min(void) {
     }
     if (unit == FEED_UNIT_MM_REV) {
         uint32_t rpm = spindle_get_rpm();
-        if (rpm < 10U) rpm = 60U;
+        if (rpm < 10U) {
+            rpm = 60U;
+        }
         return value * (float)rpm;
     }
     return config_feed_get_min(CONFIG_FEED_MODE_ASYNC);
@@ -123,9 +129,17 @@ void ui_pot_feed_format(char *buf, size_t len, uint8_t mode) {
 }
 
 uint8_t ui_pot_poll(void) {
+    static uint8_t last_mode = 0xFF;
+
     ui_pot_read();
     uint8_t mode = fsm_manager_get_mode();
-    if (!config_feed_uses_pot(mode)) return 0;
+    if (mode != last_mode) {
+        last_mode = mode;
+        last_feed_value = -1.0f;
+    }
+    if (!config_feed_uses_pot(mode)) {
+        return 0;
+    }
 
     float feed = ui_pot_get_feed_value(mode);
     if (feed != last_feed_value) {

@@ -21,7 +21,7 @@
 #define LCD_D6_PIN 12
 #define LCD_D7_PIN 13
 
-/* --- Бипер --- */
+/* --- Бипер (PH1 D16, активный LOW — покой HIGH, см. hal_buzzer) --- */
 #define BUZZER_PIN 16
 
 /* --- Потенциометр подачи --- */
@@ -43,8 +43,8 @@
 #define HAND_AXIS_X_PIN 3
 #define HAND_AXIS_PORT_RD() (PINE & 0x30)
 
-#define HAND_SCALE_X1_PIN 15
-#define HAND_SCALE_X10_PIN 14
+#define HAND_SCALE_X1_PIN 14
+#define HAND_SCALE_X10_PIN 15
 #define HAND_SCALE_PORT_RD() (PINJ & 0x03)
 
 /* --- Кнопки меню A0-A4 = Port F --- */
@@ -83,11 +83,11 @@
 #define MODE_PIN_7 36
 #define MODE_PIN_8 37
 
-/* --- Лимиты Port A --- */
-#define LIMIT_LEFT_PIN 22
+/* --- Лимиты Port A (плата 7e2: левый=D28, задний=D22) --- */
+#define LIMIT_LEFT_PIN 28
 #define LIMIT_FRONT_PIN 24
 #define LIMIT_RIGHT_PIN 26
-#define LIMIT_REAR_PIN 28
+#define LIMIT_REAR_PIN 22
 #define LIMIT_BTN_PORT_RD() (PINA & 0x55)
 
 /* --- Лимиты: LED --- */

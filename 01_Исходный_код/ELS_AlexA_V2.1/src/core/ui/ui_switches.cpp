@@ -2,9 +2,10 @@
 #include "ui_io.h"
 #include "../motion/motion_jog.h"
 #include "../debug/debug_serial.h"
+#include "../hal/hal_buzzer.h"
 #include "../hal/hal_pins.h"
+#include "../../config/config_board.h"
 #include "../../config/config_defs.h"
-#include "../../config/config_storage.h"
 #include <Arduino.h>
 #include <EncButton.h>
 
@@ -41,20 +42,23 @@ static void set_sw_level(VirtButton &btn) {
 }
 
 static void ui_buzzer_mode_beep(void) {
-    if (!config_get_buzzer_on()) return;
-    tone(BUZZER_PIN, 2500, 40);
+    hal_buzzer_beep_ms(40);
 }
 
 static uint8_t scan_mode_pin(void) {
-    if (sw_mode_1.pressing()) return 1;
-    if (sw_mode_2.pressing()) return 2;
-    if (sw_mode_3.pressing()) return 3;
-    if (sw_mode_4.pressing()) return 4;
-    if (sw_mode_5.pressing()) return 5;
-    if (sw_mode_6.pressing()) return 6;
-    if (sw_mode_7.pressing()) return 7;
-    if (sw_mode_8.pressing()) return 8;
-    return 0;
+    uint8_t raw = 0;
+    if (sw_mode_1.pressing()) raw = 1;
+    else if (sw_mode_2.pressing()) raw = 2;
+    else if (sw_mode_3.pressing()) raw = 3;
+    else if (sw_mode_4.pressing()) raw = 4;
+    else if (sw_mode_5.pressing()) raw = 5;
+    else if (sw_mode_6.pressing()) raw = 6;
+    else if (sw_mode_7.pressing()) raw = 7;
+    else if (sw_mode_8.pressing()) raw = 8;
+    if (raw == 0) {
+        return 0;
+    }
+    return board_remap_mode_pin(raw);
 }
 
 static uint8_t read_mode(void) {
@@ -91,9 +95,9 @@ static uint8_t read_mpg_axis(void) {
 static uint8_t read_mpg_scale(void) {
     uint8_t v = HAND_SCALE_PORT_RD();
     if (v == 0x02) {
-        latched_mpg_scale = 0;  /* D15 LOW — x1step */
+        latched_mpg_scale = 0;  /* D14 LOW — x1step */
     } else if (v == 0x01) {
-        latched_mpg_scale = 1;  /* D14 LOW — 0.01 мм */
+        latched_mpg_scale = 1;  /* D15 LOW — 0.01 мм */
     }
     return latched_mpg_scale;
 }

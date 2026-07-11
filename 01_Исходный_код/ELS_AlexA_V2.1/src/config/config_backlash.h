@@ -12,6 +12,7 @@ extern "C" {
 
 void config_backlash_load(void);
 void config_backlash_save(void);
+void config_backlash_factory_reset(void);
 
 uint8_t config_backlash_get_auto_on(void);      /* 1 — очередь при старте */
 uint16_t config_backlash_get_steps_x(void);     /* 0 — из CENTIMM */

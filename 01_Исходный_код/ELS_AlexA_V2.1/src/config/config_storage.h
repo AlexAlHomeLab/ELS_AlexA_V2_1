@@ -18,6 +18,7 @@ extern "C" {
 
 void config_load(void);   /* все подсистемы config_*_load */
 void config_save(void);   /* только блок 0..3 (feed_max, buzzer) */
+void config_factory_reset(void);  /* все блоки EEPROM → заводские */
 
 uint8_t config_get_feed_max(void);    /* % */
 uint8_t config_get_buzzer_on(void);   /* 0/1 */

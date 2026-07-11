@@ -1,6 +1,8 @@
 #include "config_storage.h"
 #include "config_feed.h"
 #include "config_machine.h"
+#include "config_backlash.h"
+#include "config_display.h"
 #include "../core/debug/debug_serial.h"
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -84,6 +86,16 @@ void config_save(void) {
     } else {
         DBG_INFO("CFG", "SAVE", "verify fail");
     }
+}
+
+void config_factory_reset(void) {
+    config_apply(CONFIG_FEED_MAX_DEFAULT, CONFIG_BUZZER_DEFAULT);
+    config_write_eeprom();
+    config_feed_factory_reset();
+    config_machine_factory_reset();
+    config_backlash_factory_reset();
+    config_display_factory_reset();
+    DBG_INFO("CFG", "FACT", "done");
 }
 
 uint8_t config_get_feed_max(void) {

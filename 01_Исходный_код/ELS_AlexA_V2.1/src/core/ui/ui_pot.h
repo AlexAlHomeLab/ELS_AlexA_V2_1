@@ -17,6 +17,7 @@ uint8_t ui_pot_get_mode(void);
 uint8_t ui_pot_get_submode(void);
 uint8_t ui_pot_poll(void);
 float ui_pot_get_feed_value(uint8_t mode);
+float ui_pot_get_feed_mm_rev(void);
 float ui_pot_get_jog_mm_min(void);
 void ui_pot_feed_format(char *buf, size_t len, uint8_t mode);
 
