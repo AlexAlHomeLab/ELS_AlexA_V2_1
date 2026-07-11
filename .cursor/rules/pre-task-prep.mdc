@@ -23,6 +23,9 @@ alwaysApply: true
 | РГИ / MPG, hand_pos, точное позиционирование | `els-rgi-mpg` |
 | Лимиты LimL/F/R/Re, go_lim, clamp | `els-limits` |
 | Люфт, backlash, BlX/BlZ, rem_x/rem_z | `els-backlash` |
+| Профиль движения, разгон/торможение, виды дистанций | `els-motion-types` |
+| Делительная головка, divider, деление окружности | `els-divider` |
+| Подхват резьбы, COU как ΔZ, виртуальная гайка | `els-divider-thread-align` |
 
 Если тема неочевидна — просмотри описания всех скилов и выбери подходящие.
 
