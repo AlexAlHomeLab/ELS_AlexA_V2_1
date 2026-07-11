@@ -18,7 +18,7 @@ extern "C" {
 
 /* --- Диапазоны потенциометра (заводские, EEPROM) --- */
 #define CONFIG_FEED_ASYNC_MIN_DEFAULT   20    /* мм/мин */
-#define CONFIG_FEED_ASYNC_MAX_DEFAULT   400   /* мм/мин */
+#define CONFIG_FEED_ASYNC_MAX_DEFAULT   3000   /* мм/мин */
 #define CONFIG_FEED_SYNC_MIN_DEFAULT    1     /* x100: 0.01 мм/об (7e2 MIN_FEED) */
 #define CONFIG_FEED_SYNC_MAX_DEFAULT    60    /* x100: 0.60 мм/об (7e2 MAX_FEED) */
 #define CONFIG_FEED_SYNC_RAW_SCALE      0.01f /* мм/об на единицу raw */
@@ -29,11 +29,11 @@ extern "C" {
 #define CONFIG_FEED_ASYNC_EDIT_MIN_LOW  10
 #define CONFIG_FEED_ASYNC_EDIT_MIN_HIGH 990
 #define CONFIG_FEED_ASYNC_EDIT_MAX_LOW  20
-#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 1000
+#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 3000
 #define CONFIG_FEED_SYNC_EDIT_MIN_LOW   1
 #define CONFIG_FEED_SYNC_EDIT_MIN_HIGH  199
 #define CONFIG_FEED_SYNC_EDIT_MAX_LOW   2
-#define CONFIG_FEED_SYNC_EDIT_MAX_HIGH  200
+#define CONFIG_FEED_SYNC_EDIT_MAX_HIGH  600
 
 typedef enum {
     FEED_RANGE_ASYNC = 0,  /* мм/мин */

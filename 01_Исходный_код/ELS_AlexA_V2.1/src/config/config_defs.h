@@ -64,7 +64,7 @@
 #define BACKLASH_AUTO_SPEED_MAX       200
 #define BACKLASH_MIN_SPEED_DEFAULT    20
 #define BACKLASH_MIN_SPEED_MIN        5
-#define BACKLASH_MIN_SPEED_MAX        200
+#define BACKLASH_MIN_SPEED_MAX        1000
 
 /* --- Единицы отображения координат (EEPROM $44 / меню CrdU) --- */
 #define COORD_UNIT_STEPS              0
