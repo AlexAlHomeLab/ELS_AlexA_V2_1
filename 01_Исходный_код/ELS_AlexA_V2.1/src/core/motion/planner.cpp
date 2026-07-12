@@ -298,7 +298,20 @@ uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char 
     ux = (uint32_t)((dx < 0) ? -dx : dx);
     uz = (uint32_t)((dz < 0) ? -dz : dz);
 
-    if (ux == 0U && uz == 0U) return 0U;
+    if (ux == 0U && uz == 0U) {
+        /* Джойстик у лимита: цель не сдвигается — retarget только скорости (pot) */
+        if (cruise && dds_motion_jog_cruise_active()) {
+            memset(&cmd, 0, sizeof(cmd));
+            cmd.target_x = tx;
+            cmd.target_z = tz;
+            cmd.nominal_mm_min = speed_mm_min;
+            cmd.flags = MOTION_FLAG_JOG | MOTION_FLAG_JOG_CRUISE;
+            if (dds_motion_jog_retarget(&cmd)) {
+                return 1U;
+            }
+        }
+        return 0U;
+    }
 
     master = (ux >= uz) ? AXIS_X : AXIS_Z;
     speed_mm_min = cap_speed_mm_min(master, speed_mm_min);
@@ -320,14 +333,10 @@ uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char 
     }
 
     if (dds_motion_busy()) {
-        if (!cruise || !dds_motion_jog_cruise_active()) {
-            if (cruise) {
-                entry = 0.0f;
-            } else {
-                float ex = dds_motion_get_speed_mm_min(AXIS_X);
-                float ez = dds_motion_get_speed_mm_min(AXIS_Z);
-                entry = (ex > ez) ? ex : ez;
-            }
+        {
+            float ex = dds_motion_get_speed_mm_min(AXIS_X);
+            float ez = dds_motion_get_speed_mm_min(AXIS_Z);
+            entry = (ex > ez) ? ex : ez;
         }
         {
             uint8_t sreg = SREG;

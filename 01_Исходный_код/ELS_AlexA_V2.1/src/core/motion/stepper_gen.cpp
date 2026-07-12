@@ -860,15 +860,17 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
     }
 
     if (um == 0U) {
+        /* pos==target при удержании джойстика: не выключать cruise, обновить скорость */
         if (motion_prof.jog_cruise) {
-            motion_prof.active = 0U;
-            motion_prof.jog_cruise = 0U;
-            axis_x.enabled = 0U;
-            axis_z.enabled = 0U;
-            axis_x.step_increment = 0U;
-            axis_z.step_increment = 0U;
+            uint8_t master = motion_prof.master_axis;
+            float cap = (float)config_get_max_speed_mm_min(master);
+            float spd = cmd->nominal_mm_min;
+
+            if (spd > cap) spd = cap;
+            motion_prof.nominal_rate = mm_min_to_sps(master, spd);
+            motion_apply_rates();
+            rc = 1U;
         }
-        rc = 1U;
         goto dds_retarget_exit;
     }
 

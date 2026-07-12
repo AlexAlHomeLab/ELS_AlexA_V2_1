@@ -577,9 +577,10 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
         tx = jog_clamp_target(AXIS_X, tx + x_sign * chunk_x, btn.joy_rapid);
     }
 
+    /* Лимит/цель=позиция: cruise не гасим — только обновить скорость с пота (7e2 aFeed) */
     if (tx == ox && tz == oz) {
         if (dds_motion_jog_cruise_active() && !mpg_active) {
-            planner_jog_stop();
+            planner_exec_jog(tx, tz, jog_speed_dual_mm_min(btn.joy_rapid), "JOY", 1, 0U, 0U, 0L);
         }
         return;
     }
