@@ -15,7 +15,7 @@
       "type": "wokwi-potentiometer",
       "id": "potFeed",
       "top": 478.7,
-      "left": 739,
+      "left": 719.8,
       "attrs": { "value": "512", "label": "Feed A7" }
     },
     {
@@ -28,79 +28,94 @@
     {
       "type": "wokwi-resistor",
       "id": "rLcdBl",
-      "top": -20,
-      "left": 480,
+      "top": -14.95,
+      "left": 373,
+      "rotate": 270,
       "attrs": { "value": "220", "label": "LCD BL" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM30",
-      "top": 0,
-      "left": 560,
+      "top": -15.8,
+      "left": 536.75,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D30" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM31",
-      "top": 0,
-      "left": 615,
+      "top": -15.8,
+      "left": 594.35,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D31" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM32",
-      "top": 0,
-      "left": 670,
+      "top": -15.8,
+      "left": 699.95,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D32" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM33",
-      "top": 0,
-      "left": 725,
+      "top": -15.8,
+      "left": 757.55,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D33" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM34",
-      "top": 0,
-      "left": 780,
+      "top": -15.8,
+      "left": 815.15,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D34" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM35",
-      "top": 0,
-      "left": 835,
+      "top": -15.8,
+      "left": 872.75,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D35" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM36",
-      "top": 0,
-      "left": 890,
+      "top": -15.8,
+      "left": 920.75,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D36" }
     },
     {
       "type": "wokwi-resistor",
       "id": "resM37",
-      "top": 0,
-      "left": 945,
+      "top": -15.8,
+      "left": 978.35,
+      "rotate": 270,
       "attrs": { "value": "1000", "label": "1k D37" }
     },
-    { "type": "wokwi-buzzer", "id": "bz1", "top": 120, "left": 720, "attrs": { "volume": "0.5" } },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": 117.6,
+      "left": 721.8,
+      "attrs": { "volume": "0.5" }
+    },
     {
       "type": "wokwi-ky-040",
       "id": "encSpindle",
-      "top": -276.7,
-      "left": 479.2,
+      "top": -228.7,
+      "left": 469.6,
       "attrs": { "label": "Spindle enc D20/D21" }
     },
     {
       "type": "wokwi-ky-040",
       "id": "encHand",
-      "top": 20.9,
-      "left": -202.4,
+      "top": -17.5,
+      "left": -192.8,
       "attrs": { "label": "Hand enc D18/D19" }
     },
     { "type": "wokwi-a4988", "id": "drvZ", "top": 200, "left": 820, "attrs": {} },
@@ -108,15 +123,15 @@
     {
       "type": "wokwi-stepper-motor",
       "id": "motZ",
-      "top": 118.81,
-      "left": 1046.83,
+      "top": 128.41,
+      "left": 950.83,
       "attrs": { "size": "17", "display": "steps", "arrow": "blue", "label": "Motor Z" }
     },
     {
       "type": "wokwi-stepper-motor",
       "id": "motX",
-      "top": 339.61,
-      "left": 1056.43,
+      "top": 349.21,
+      "left": 950.83,
       "attrs": { "size": "17", "display": "steps", "arrow": "green", "label": "Motor X" }
     },
     {
@@ -136,8 +151,8 @@
     {
       "type": "wokwi-led",
       "id": "ledLimRear",
-      "top": 514.8,
-      "left": -111.4,
+      "top": 274.8,
+      "left": -303.4,
       "attrs": { "color": "red", "label": "LED Rear D23", "flip": "1" }
     },
     {
@@ -152,7 +167,7 @@
       "type": "wokwi-led",
       "id": "ledLimFront",
       "top": 188.4,
-      "left": -139.8,
+      "left": -111.4,
       "attrs": { "color": "red", "label": "LED Front D25", "flip": "1" }
     },
     {
@@ -168,7 +183,7 @@
       "id": "ledLimRight",
       "top": 351.6,
       "left": 109.4,
-      "attrs": { "color": "red", "label": "LED Right D27" }
+      "attrs": { "color": "red", "label": "LED Right D27", "flip": "1" }
     },
     {
       "type": "wokwi-resistor",
@@ -181,8 +196,8 @@
     {
       "type": "wokwi-led",
       "id": "ledLimLeft",
-      "top": 294,
-      "left": -322.2,
+      "top": 514.8,
+      "left": -111,
       "attrs": { "color": "red", "label": "LED Left D29", "flip": "1" }
     },
     {
@@ -252,43 +267,43 @@
     {
       "type": "wokwi-pushbutton",
       "id": "btnDown",
-      "top": -118.6,
-      "left": 9.6,
+      "top": -109,
+      "left": 28.8,
       "attrs": { "color": "green", "bounce": "0", "label": "Down A0", "key": "s" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnUp",
-      "top": -118.6,
-      "left": -57.6,
+      "top": -109,
+      "left": -48,
       "attrs": { "color": "green", "bounce": "0", "label": "Up A1", "key": "w" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnRight",
-      "top": -118.6,
+      "top": -109,
       "left": -124.8,
       "attrs": { "color": "green", "bounce": "0", "label": "Right A2", "key": "d" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnLeft",
-      "top": -118.6,
+      "top": -109,
       "left": -201.6,
       "attrs": { "color": "green", "bounce": "0", "label": "Left A3", "key": "a" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnSel",
-      "top": -118.6,
-      "left": 86.4,
+      "top": -109,
+      "left": 96,
       "attrs": { "color": "green", "bounce": "0", "label": "Select A4", "key": "e" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnJoyL",
-      "top": 361.4,
-      "left": -240,
+      "top": 351.8,
+      "left": -230.4,
       "attrs": { "color": "orange", "bounce": "0", "label": "Joy Left A8", "key": "ArrowLeft" }
     },
     {
@@ -322,57 +337,57 @@
     {
       "type": "wokwi-slide-switch",
       "id": "swSubInt",
-      "top": 186.8,
-      "left": 156.7,
+      "top": 158,
+      "left": 243.1,
       "attrs": { "bounce": "0", "label": "Sub Int A13", "value": "1" }
     },
     {
       "type": "wokwi-slide-switch",
       "id": "swSubMan",
-      "top": 186.8,
-      "left": 108.7,
+      "top": 158,
+      "left": 195.1,
       "attrs": { "bounce": "0", "label": "Sub Man A14", "value": "" }
     },
     {
       "type": "wokwi-slide-switch",
       "id": "swSubExt",
-      "top": 186.8,
-      "left": 60.7,
+      "top": 158,
+      "left": 147.1,
       "attrs": { "bounce": "0", "label": "Sub Ext A15", "value": "1" }
     },
     {
       "type": "wokwi-slide-switch",
       "id": "swHandZ",
-      "top": 71.6,
-      "left": -35.3,
+      "top": 42.8,
+      "left": -25.7,
       "attrs": { "bounce": "0", "label": "Hand axis Z D2" }
     },
     {
       "type": "wokwi-slide-switch",
       "id": "swHandX",
-      "top": 71.6,
-      "left": -83.3,
+      "top": 42.8,
+      "left": -64.1,
       "attrs": { "bounce": "0", "label": "Hand axis X D3" }
     },
     {
       "type": "wokwi-slide-switch",
       "id": "swScaleX1",
-      "top": 119.6,
-      "left": -198.5,
+      "top": 81.2,
+      "left": -188.9,
       "attrs": { "bounce": "0", "label": "Scale x1 D15" }
     },
     {
       "type": "wokwi-slide-switch",
       "id": "swScaleX10",
-      "top": 119.6,
+      "top": 81.2,
       "left": -150.5,
       "attrs": { "bounce": "0", "label": "Scale x10 D14" }
     },
     {
       "type": "wokwi-pushbutton",
       "id": "btnLimL",
-      "top": 361.4,
-      "left": -326.4,
+      "top": 447.8,
+      "left": -124.8,
       "attrs": { "color": "gray", "bounce": "0", "label": "Limit Left D22" }
     },
     {
@@ -392,15 +407,15 @@
     {
       "type": "wokwi-pushbutton",
       "id": "btnLimRe",
-      "top": 467,
-      "left": -124.8,
+      "top": 351.8,
+      "left": -307.2,
       "attrs": { "color": "gray", "bounce": "0", "label": "Limit Rear D28" }
     }
   ],
   "connections": [
     [ "lcd1:VSS", "mega:GND.1", "black", [] ],
     [ "lcd1:VDD", "mega:5V", "red", [] ],
-    [ "lcd1:V0", "potLcdContrast:SIG", "green", [] ],
+    [ "lcd1:V0", "potLcdContrast:SIG", "green", [ "h844.5", "v76.8" ] ],
     [ "potLcdContrast:VCC", "mega:5V", "red", [] ],
     [ "potLcdContrast:GND", "mega:GND.2", "black", [] ],
     [ "lcd1:RW", "mega:GND.3", "black", [] ],
@@ -411,7 +426,7 @@
     [ "lcd1:D6", "mega:12", "green", [] ],
     [ "lcd1:D7", "mega:13", "green", [] ],
     [ "mega:5V", "rLcdBl:1", "red", [] ],
-    [ "rLcdBl:2", "lcd1:A", "red", [ "v-100.85", "h-577.1" ] ],
+    [ "rLcdBl:2", "lcd1:A", "red", [ "h0.55", "v-105.25" ] ],
     [ "lcd1:K", "mega:GND.4", "black", [] ],
     [ "potFeed:SIG", "mega:A7", "green", [] ],
     [ "potFeed:VCC", "mega:5V", "red", [] ],
@@ -420,8 +435,8 @@
     [ "bz1:2", "mega:16", "purple", [] ],
     [ "encSpindle:CLK", "mega:21", "green", [] ],
     [ "encSpindle:DT", "mega:20", "green", [] ],
-    [ "encSpindle:GND", "mega:GND.1", "black", [] ],
-    [ "encSpindle:VCC", "mega:5V", "red", [] ],
+    [ "encSpindle:GND", "mega:GND.1", "black", [ "v29.6", "h-146.6" ] ],
+    [ "encSpindle:VCC", "mega:5V", "red", [ "v38.8", "h-101.1" ] ],
     [ "encHand:CLK", "mega:19", "green", [] ],
     [ "encHand:DT", "mega:18", "green", [] ],
     [ "encHand:GND", "mega:GND.1", "black", [] ],
@@ -456,17 +471,17 @@
     [ "rTacho:2", "ledTacho:A", "red", [] ],
     [ "ledTacho:C", "mega:42", "yellow", [] ],
     [ "mega:5V", "rLedRear:1", "red", [] ],
-    [ "rLedRear:2", "ledLimRear:A", "red", [] ],
+    [ "rLedRear:2", "ledLimRear:A", "red", [ "h-538.15", "v-297.95" ] ],
     [ "ledLimRear:C", "mega:23", "red", [] ],
     [ "mega:5V", "rLedFront:1", "red", [] ],
-    [ "rLedFront:2", "ledLimFront:A", "red", [] ],
+    [ "rLedFront:2", "ledLimFront:A", "red", [ "h-614.95", "v-384.35" ] ],
     [ "ledLimFront:C", "mega:25", "red", [] ],
     [ "mega:5V", "rLedRight:1", "red", [] ],
     [ "rLedRight:2", "ledLimRight:A", "red", [] ],
     [ "ledLimRight:C", "mega:27", "red", [] ],
     [ "mega:5V", "rLedLeft:1", "red", [] ],
-    [ "rLedLeft:2", "ledLimLeft:A", "red", [ "v28.45", "h-710.95" ] ],
-    [ "ledLimLeft:C", "mega:29", "red", [ "v-28.8", "h988.2" ] ],
+    [ "rLedLeft:2", "ledLimLeft:A", "red", [] ],
+    [ "ledLimLeft:C", "mega:29", "red", [ "v57.6", "h777" ] ],
     [ "mega:5V", "resM30:1", "red", [] ],
     [ "resM30:2", "mega:30", "blue", [] ],
     [ "btnM1:1.l", "mega:30", "blue", [] ],

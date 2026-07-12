@@ -153,6 +153,87 @@ ELS_AlexA_V2_1/
 
 ---
 
+## Настройки
+
+Параметры делятся на два уровня:
+
+| Уровень | Где | Как менять |
+|---------|-----|------------|
+| **Компиляция** | `#define` в `src/config/`, `hal_pins.h` | Правка исходников → пересборка |
+| **Рантайм** | EEPROM (4 КБ ATmega2560) | Меню LCD (долгое Select) или Serial `$` |
+
+Загрузка при старте: `config_load()` → `config_feed_load()`, `config_machine_load()`, `config_backlash_load()`, `config_display_load()`.
+
+### Файлы конфигурации (compile-time)
+
+| Файл | Назначение | Примеры параметров |
+|------|------------|-------------------|
+| [`config.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config.h) | Главный заголовок, тайминги, отладка | `FIRMWARE_STAGE`, `SERIAL_BAUD`, `DEBUG_ENABLED`, `DEBUG_LEVEL`, `STEP_ISR_PERIOD_US`, `LCD_UPDATE_MS`, `POT_READ_MS` |
+| [`config_defs.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_defs.h) | Общие константы проекта | `ENABLE_BACKLASH`, `BACKLASH_*_DEFAULT`, `AXIS_*_DIR_INVERT_DEFAULT`, `BLOCK_BUFFER_SIZE`, `COORD_UNIT_DEFAULT` |
+| [`config_machine.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_machine.h) | Заводские значения станка (до EEPROM) | `AXIS_X/Z_MOTOR_STEPS_DEFAULT`, `SCREW_PITCH_DEFAULT`, `MAX/RAPID_SPEED_DEFAULT`, `SPINDLE_PPR_DEFAULT`, `JOG_DECEL_STEPS_DEFAULT` |
+| [`config_feed.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_feed.h) | Диапазоны потенциометра подачи | `CONFIG_FEED_ASYNC_MIN/MAX_DEFAULT`, `CONFIG_FEED_SYNC_MIN/MAX_DEFAULT` |
+| [`config_backlash.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_backlash.h) | API люфта (значения — в EEPROM) | `config_backlash_get/set_*` |
+| [`config_display.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_display.h) | Единицы координат на LCD | `config_get/set_coord_units()` |
+| [`config_storage.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_storage.h) | Общий загрузчик EEPROM | `config_load/save/factory_reset()`, `feed_max`, `buzzer` |
+| [`config_modes.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_modes.h) | Включение режимов при сборке | `ENABLE_MODE_ASYNC/SYNC/THREAD/…` |
+| [`config_board.h`](01_Исходный_код/ELS_AlexA_V2.1/src/config/config_board.h) | Remap 8-поз. селектора (плата 7e2) | `BOARD_MODE_PIN_REMAP` |
+| [`hal_pins.h`](01_Исходный_код/ELS_AlexA_V2.1/src/core/hal/hal_pins.h) | Разводка пинов Mega 2560 | STEP/DIR, LCD, энкодеры, joy, лимиты, E-Stop |
+| [`diagram.json`](01_Исходный_код/ELS_AlexA_V2.1/diagram.json) | Схема Wokwi (должна совпадать с `hal_pins.h`) | Состав периферии и пины |
+
+Заглушки на будущее: `config_platform.h`, `config_process.h`.
+
+### Параметры в EEPROM
+
+| Адрес | Блок | Serial `$` | Меню LCD | Параметр |
+|-------|------|------------|----------|----------|
+| 0–3 | `config_storage` | `$31` (Buzz) | Buzz | magic, feed_max% (legacy), buzzer, checksum |
+| 16–25 | `config_feed` | `$0`–`$3` | aMin, aMax, sMin, sMax | Async min/max (мм/мин), Sync min/max (мм/об) |
+| 32–55 | `config_machine` | `$10`–`$32` | Zstp…Jdec | Оси X/Z, шпиндель, jog decel |
+| 56–64 | `config_backlash` | `$40`–`$45` | BlAu, BlX, BlZ, BlSp, BlMn | Люфт: автовыборка, шаги X/Z, скорости |
+| 70–72 | `config_display` | `$44` | CrdU | Единицы координат: 0=шаги, 1=мм, 2=дюймы |
+
+**Ось Z** (`$10`–`$17`, меню Zstp…Zacc, Zinv):
+
+| `$` | Меню | Описание |
+|-----|------|----------|
+| `$10` | Zstp | Полных шагов двигателя |
+| `$11` | ZuSt | Микрошаг (1…32) |
+| `$12` | Zpit | Шаг ВПК, мм (×100 в EEPROM) |
+| `$13` | Zmax | Макс. подача, мм/мин |
+| `$14` | Zrap | Rapid, мм/мин |
+| `$15` | Zacc | Ускорение (×50 мм/с²) |
+| `$16` | — | Шагов/мм (только чтение) |
+| `$17` | Zinv | Инверсия DIR (0/1) |
+
+**Ось X** (`$20`–`$27`, меню Xstp…Xacc, Xinv) — те же поля, префикс X.
+
+**Прочие:**
+
+| `$` | Меню | Описание |
+|-----|------|----------|
+| `$30` | Spdl | PPR энкодера шпинделя |
+| `$31` | Buzz | Зуммер (0/1) |
+| `$32` | Jdec | Мин. шаги торможения джойстика (0 = мгновенный стоп) |
+| `$40` | BlAu | Автовыборка люфта при старте |
+| `$41`–`$42` | BlX, BlZ | Шаги выборки (0 → из `BACKLASH_*_CENTIMM`) |
+| `$43` | BlSp | Макс. скорость выборки, мм/мин |
+| `$45` | BlMn | Мин. скорость выборки, мм/мин |
+| `$44` | CrdU | Единицы координат на LCD |
+
+Сброс всех блоков EEPROM: пункт меню **dEFt** или `config_factory_reset()`.
+
+### Меню LCD (28 параметров)
+
+Вход: **долгое нажатие Select** (~600 ms). Навигация: Up/Down — пункт, Right/Left — цифра, short Select — редактирование/сохранение.
+
+Порядок пунктов (`ui_menu.cpp`): aMin, aMax, sMin, sMax → Zstp, ZuSt, Zpit, Zmax, Zrap, Zacc → Xstp, XuSt, Xpit, Xmax, Xrap, Xacc → Spdl, Buzz, Zinv, Xinv → BlAu, BlX, BlZ, BlSp, BlMn → Jdec, CrdU → **dEFt** (заводской сброс).
+
+### Serial CLI
+
+Команды GRBL-стиля: `$$` — список, `$n` — чтение, `$n=val` — запись, `$I` — инфо, `?` — статус. Подробнее — [DEBUG.md](02_Документация/DEBUG.md).
+
+---
+
 ## Быстрый старт
 
 ### 1. Клонирование
@@ -182,18 +263,9 @@ EncButton и GyverIO уже лежат в `libraries/` проекта.
 
 ### 4. Настройка
 
-Параметры станка — в **меню EEPROM** (долгое нажатие Select) или через Serial `$`.
+Параметры станка — в **меню EEPROM** (долгое нажатие Select) или через Serial `$`. Полная карта файлов, адресов EEPROM и пунктов меню — в разделе [Настройки](#настройки).
 
-Главный конфиг: `src/config/config.h` — тайминги, уровень отладки, `FIRMWARE_STAGE`.
-
-```cpp
-#define FIRMWARE_NAME   "ELS AlexA V2.1"
-#define FIRMWARE_STAGE  "Stage 2.2f"
-#define SERIAL_BAUD     115200
-#define DEBUG_ENABLED   1
-```
-
-Шаги/мм, max/rapid/accel, PPR шпинделя — в EEPROM (`config_machine`), не в `#define`.
+Для первой сборки проверьте `config.h` (`DEBUG_ENABLED`, `FIRMWARE_STAGE`) и совпадение пинов `hal_pins.h` с вашей платой.
 
 ---
 

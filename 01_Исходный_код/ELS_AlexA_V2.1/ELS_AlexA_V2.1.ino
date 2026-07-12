@@ -148,6 +148,7 @@ static void lcd_format_decimal_num(char *dst, uint32_t whole, uint32_t frac) {
     dst[7] = 0;
 }
 
+/* Шаги → мм (или дюймы): val1000 = тысячные доли мм для lcd_format_decimal_num. */
 static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units,
                               uint32_t *whole, uint32_t *frac, int8_t *neg) {
     uint32_t abs_s = (steps < 0) ? (uint32_t)(-steps) : (uint32_t)steps;
@@ -169,8 +170,8 @@ static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units,
         return;
     }
 
-    val1000 = (abs_s / den) * (uint32_t)pitch * 1000UL;
-    val1000 += (((uint32_t)(abs_s % den) * (uint32_t)pitch * 1000UL) / den);
+    /* uint64: abs_s×pitch×1000 не помещается в uint32 при типичном ходе оси */
+    val1000 = (uint32_t)(((uint64_t)abs_s * (uint64_t)pitch * 1000ULL) / den);
     if (units == COORD_UNIT_INCH) {
         val1000 = (val1000 * 10000UL + 127000UL) / 254000UL;
     }
