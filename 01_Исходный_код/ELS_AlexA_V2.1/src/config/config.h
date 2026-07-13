@@ -48,6 +48,7 @@
 #include "config_defs.h"
 #include "config_machine.h"
 #include "config_backlash.h"
+#include "config_lcd.h"
 #include "config_display.h"
 
 /* Рантайм-значения из EEPROM (config_machine) */

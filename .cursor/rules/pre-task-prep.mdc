@@ -19,6 +19,7 @@ alwaysApply: true
 | Тема задачи | Скил |
 |-------------|------|
 | LCD, меню, главный экран, CrdU, Feed | `els-display-menu` |
+| LCD-библиотека, USE_LCD_*, SafeAsync, Timer5 дисплея | `els-lcd-libraries` |
 | Джойстик подач, rapid, pot feed, jog | `els-joy-feed` |
 | РГИ / MPG, hand_pos, точное позиционирование | `els-rgi-mpg` |
 | Лимиты LimL/F/R/Re, go_lim, clamp | `els-limits` |

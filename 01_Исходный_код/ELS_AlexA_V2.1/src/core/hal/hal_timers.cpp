@@ -2,7 +2,6 @@
 #include "../motion/stepper_gen.h"
 #include "../process/spindle_control.h"
 #include "../ui/ui_pot.h"
-#include "../ui/ui_lcd.h"
 #include <Arduino.h>
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
@@ -59,15 +58,4 @@ void timer4_init(uint16_t ms) {
 
 ISR(TIMER4_COMPA_vect) {
     ui_pot_read();
-}
-
-void timer5_init(uint16_t ms) {
-    TCCR5A = 0;
-    TCCR5B = (1 << WGM52) | (1 << CS51) | (1 << CS50);
-    OCR5A = ms * 250UL;
-    TIMSK5 = (1 << OCIE5A);
-}
-
-ISR(TIMER5_COMPA_vect) {
-    ui_lcd_update();
 }

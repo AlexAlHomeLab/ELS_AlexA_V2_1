@@ -472,6 +472,8 @@ void setup() {
 }
 
 void loop() {
+    ui_lcd_process_queue();
+
     if (!startup_armed) {
         startup_armed = 1;
         planner_startup_backlash_queue();
@@ -507,4 +509,6 @@ void loop() {
         }
         last_lcd_ms = millis();
     }
+
+    ui_lcd_process_queue();
 }

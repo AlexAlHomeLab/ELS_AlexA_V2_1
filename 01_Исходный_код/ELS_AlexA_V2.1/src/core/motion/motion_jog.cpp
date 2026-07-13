@@ -553,7 +553,7 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
                 mpg_rev_cnt = 0;
             }
         }
-        if ((was_z_on || was_x_on) && !mpg_active) {
+        if ((was_z_on || was_x_on)) {
             planner_jog_stop();
         }
         return;

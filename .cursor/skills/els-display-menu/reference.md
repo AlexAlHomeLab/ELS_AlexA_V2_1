@@ -14,7 +14,8 @@
 ├── src/core/ui/ui_menu.h
 ├── src/core/ui/ui_buttons.cpp      # Select long/short, reset_joy
 ├── src/core/ui/ui_pot.cpp          # ui_pot_feed_format
-├── src/core/hal/hal_timers.cpp     # Timer5 → ui_lcd_update
+├── src/core/hal/hal_timers.cpp     # таймеры ISR (LCD — не Timer5, см. els-lcd-libraries)
+├── src/config/config_lcd.h         # USE_LCD_STANDARD | USE_LCD_SAFE_ASYNC
 └── src/core/hal/hal_pins.h         # LCD_RS/EN/D4-D7, BTN_*
 ```
 
@@ -22,7 +23,8 @@
 
 ```c
 void ui_lcd_init(void);
-void ui_lcd_update(void);                    /* flush буфера на HD44780 */
+void ui_lcd_update(void);                    /* flush буфера на HD44780 (только loop) */
+void ui_lcd_process_queue(void);             /* SafeAsync: drain очереди; см. els-lcd-libraries */
 void ui_lcd_set_line(uint8_t line, const char *text);   /* pad spaces */
 void ui_lcd_set_line_raw(uint8_t line, const char *text); /* ровно LCD_COLS */
 void ui_lcd_clear_line(uint8_t line);
@@ -131,13 +133,16 @@ void ui_pot_feed_format(char *buf, size_t len, uint8_t mode);
 ## Поток данных
 
 ```
-loop:
-  ui_menu_poll()          → open/edit/save/navigate
-  update_lcd()            → ui_menu_lcd | update_main_lcd → lcd_buffer[][]
-  ui_lcd_update() @80ms    → LiquidCrystal.print (loop)
-Timer5 ISR:
-  ui_lcd_update()          → flush (дублирует loop, синхронизация)
+loop (каждый проход):
+  ui_lcd_process_queue()   → [SafeAsync] drain очереди драйвера
+  ui_menu_poll()           → open/edit/save/navigate
+  lcd_mark_dirty_if_changed()
+  if (lcd_dirty && 80 ms):
+    update_lcd()           → ui_menu_lcd | update_main_lcd → lcd_buffer[][]
+    ui_lcd_update()        → flush на HD44780 (только loop, не ISR)
 ```
+
+Timer5 для LCD **не используется** — см. `els-lcd-libraries`.
 
 ## Select — state machine (ui_menu)
 
