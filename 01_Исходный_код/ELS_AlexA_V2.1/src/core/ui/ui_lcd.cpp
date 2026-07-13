@@ -35,11 +35,17 @@ static void lcd_drain_queue(unsigned long us_budget) {
 }
 #endif
 
-/* SafeAsync: короткий drain очереди из loop (не из ISR). */
+/* SafeAsync: drain очереди на HD44780 по бюджету за проход loop (не из ISR). */
 void ui_lcd_process_queue(void) {
 #if defined(USE_LCD_SAFE_ASYNC)
-    lcd.processQueue();
-    //lcd_drain_queue(LCD_PROCESS_US_BUDGET);
+    lcd_drain_queue(LCD_PROCESS_US_BUDGET);
+#endif
+}
+
+/* SafeAsync: полный drain — только setup/init (до входа в loop). */
+void ui_lcd_flush(void) {
+#if defined(USE_LCD_SAFE_ASYNC)
+    lcd.flush();
 #endif
 }
 
@@ -59,11 +65,8 @@ void ui_lcd_init(void) {
     }
 }
 
+/* STANDARD: синхронный вывод. SafeAsync: только enqueue — drain в ui_lcd_process_queue(). */
 void ui_lcd_update(void) {
-#if defined(USE_LCD_SAFE_ASYNC)
-    lcd_drain_queue(LCD_FLUSH_US_BUDGET);
-#endif
-
     if (lcd_cursor_line >= LCD_ROWS) {
         lcd.noCursor();
     }
@@ -79,16 +82,12 @@ void ui_lcd_update(void) {
         lcd.cursor();
     }
 
-#if defined(USE_LCD_SAFE_ASYNC)
-    lcd_drain_queue(LCD_FLUSH_US_BUDGET);
-#if LCD_SYNC_INTERVAL_MS > 0
+#if defined(USE_LCD_SAFE_ASYNC) && (LCD_SYNC_INTERVAL_MS > 0)
     unsigned long now = millis();
     if (now - lcd_last_sync_ms >= LCD_SYNC_INTERVAL_MS) {
         lcd.syncAll();
-        lcd_drain_queue(LCD_FLUSH_US_BUDGET);
         lcd_last_sync_ms = now;
     }
-#endif
 #endif
 }
 

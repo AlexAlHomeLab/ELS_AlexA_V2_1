@@ -462,6 +462,7 @@ void setup() {
     SETUP_MARK("draw");
     update_lcd();
     ui_lcd_update();
+    ui_lcd_flush();
     lcd_cache_save_main();
     lcd_dirty = 0;
 

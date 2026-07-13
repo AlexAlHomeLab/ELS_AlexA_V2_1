@@ -8,8 +8,9 @@ extern "C" {
 #endif
 
 void ui_lcd_init(void);
-void ui_lcd_update(void);
-void ui_lcd_process_queue(void);   /* SafeAsync: drain очереди; STANDARD: no-op */
+void ui_lcd_update(void);          /* STANDARD: sync; SafeAsync: enqueue из lcd_buffer */
+void ui_lcd_process_queue(void);   /* SafeAsync: drain по LCD_PROCESS_US_BUDGET; STANDARD: no-op */
+void ui_lcd_flush(void);           /* SafeAsync: полный drain (setup); STANDARD: no-op */
 void ui_lcd_set_line(uint8_t line, const char *text);
 void ui_lcd_set_line_raw(uint8_t line, const char *text);
 void ui_lcd_clear_line(uint8_t line);
