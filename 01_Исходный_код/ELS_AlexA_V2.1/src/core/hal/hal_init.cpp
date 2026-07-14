@@ -1,6 +1,7 @@
 #include "hal_init.h"
 #include "hal_buzzer.h"
 #include "hal_pins.h"
+#include "../motion/motor_en.h"
 
 static void hal_pin_input(uint8_t pin) {
     pinMode(pin, INPUT_PULLUP);
@@ -22,6 +23,7 @@ void hal_init(void) {
     hal_pin_output_low(DIR_X_PIN);
     hal_pin_output_low(STEP_Z_PIN);
     hal_pin_output_low(DIR_Z_PIN);
+    motor_en_x_init();  /* EN_X soft-latch; EN_Z не инициализируем */
 
     hal_buzzer_init();
     hal_pin_output_high(LED_TACHO_PIN);

@@ -101,6 +101,7 @@ if (st == STATE_MANUAL) {
 - `mpg_axis`: AXIS_Z / AXIS_X (латч при LOW на соответствующем пине)
 - `mpg_scale`: 0 = 1 шаг двигателя, 1 = 0.01 мм
 - Rapid: `btn.joy_rapid` из `ui_buttons` → 0.1 мм/тик
+- Xdia=диаметр + X: 0.01 → `spm/200`, Rapid → `spm/20` (см. SKILL.md)
 
 ## Планировщик — cruise
 

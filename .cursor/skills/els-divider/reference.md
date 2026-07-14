@@ -18,11 +18,11 @@
 ## Целевой API mode_divider
 
 ```c
-void mode_divider_enter(void);
-void mode_divider_exit(void);
-void mode_divider_process(void);           /* poll кнопок + обновление LCD */
+void mode_divider_enter(void);             /* не сбрасывать A/B/zero_count */
+void mode_divider_exit(void);              /* не чистить состояние */
+void mode_divider_process(void);           /* poll кнопок + бипер R */
 
-void mode_divider_zero_reset(void);        /* Select: zero_count = spindle_get_count() */
+void mode_divider_zero_reset(void);        /* Select: только zero_count; A/B не трогать */
 void mode_divider_parts_up(void);          /* A++ */
 void mode_divider_parts_down(void);        /* A-- */
 void mode_divider_part_prev(void);         /* B--, wrap */
@@ -45,17 +45,17 @@ Legacy (не использовать в новой логике): `mode_divider
 
 | Макрос | Значение |
 |--------|----------|
-| `DIVIDER_MIN_PARTS` | 1 |
-| `DIVIDER_MAX_PARTS` | 99 |
-| `DIVIDER_DEFAULT_PARTS` | 1 |
+| `DIVIDER_MIN_PARTS` | 2 |
+| `DIVIDER_MAX_PARTS` | 999 |
+| `DIVIDER_DEFAULT_PARTS` | 2 |
 
 ## Состояние
 
 | Переменная | Тип | Описание |
 |------------|-----|----------|
-| `div_a` | `uint8_t` | A — частей (1…99) |
-| `div_b` | `uint8_t` | B — текущая часть (1…A) |
-| `div_zero_count` | `int32_t` | опорный счёт энкодера после Select |
+| `div_a` | `uint16_t` | A — частей (2…999); static, живёт между enter/exit |
+| `div_b` | `uint16_t` | B — текущая часть (1…A); не сбрасывать в enter/Select |
+| `div_zero_count` | `int32_t` | опорный счёт; пишется **только** Select |
 
 ## Формулы
 
@@ -126,12 +126,14 @@ snprintf(buf, 21, "COU %c%07ld:%04ld",
 
 | Кнопка | Действие |
 |--------|----------|
-| Up | A++ (max 99), clamp B |
-| Down | A-- (min 1), clamp B |
+| Up | A++ (max 999), clamp B |
+| Down | A-- (min 2), clamp B |
 | Left | B--, wrap |
 | Right | B++ , wrap |
-| Select | `mode_divider_zero_reset()` |
+| Select | `mode_divider_zero_reset()` — только угол; A/B без изменений |
 | Long Select | `ui_menu` open |
+
+Смена режима селектором: `exit` → другой режим → `enter`. A, B, R (через `zero_count`) **сохраняются**.
 
 ## Статус реализации
 
@@ -141,7 +143,7 @@ snprintf(buf, 21, "COU %c%07ld:%04ld",
 | LCD A/B/R/COU/угол | **нет** |
 | Up/Dn/L/R / Select | **нет** |
 | `spindle_get_count` + zero_count | **нет** |
-| `mode_divider_cfg` 1…99 | **обновить** |
+| `mode_divider_cfg` 2…999 | актуально |
 | Legacy planner/next | заготовка, **удалить при реализации** |
 
 ## FSM

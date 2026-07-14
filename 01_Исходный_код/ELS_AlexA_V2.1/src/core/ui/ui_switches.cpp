@@ -1,6 +1,7 @@
 #include "ui_switches.h"
 #include "ui_io.h"
 #include "../motion/motion_jog.h"
+#include "../motion/motor_en.h"
 #include "../debug/debug_serial.h"
 #include "../hal/hal_buzzer.h"
 #include "../hal/hal_pins.h"
@@ -18,6 +19,8 @@ static uint8_t latched_submode = SUB_MANUAL;
 static uint8_t last_submode = 0xFF;
 static uint8_t last_mpg_axis = 0xFF;
 static uint8_t last_mpg_scale = 0xFF;
+static uint8_t last_mode_off = 0xFF;  /* для лога перехода MODE_OFF */
+static unsigned long mode_off_raw_ms; /* момент первого scan==0; 0 — не ждём */
 
 static ButtonT<MODE_PIN_1> sw_mode_1;
 static ButtonT<MODE_PIN_2> sw_mode_2;
@@ -102,6 +105,27 @@ static uint8_t read_mpg_scale(void) {
     return latched_mpg_scale;
 }
 
+/* MODE_OFF только после устойчивого scan==0 (антидребезг между позициями 1–8).
+ * Выход из OFF — сразу при любом валидном пине. */
+static uint8_t mode_off_debounced(uint8_t scanned)
+{
+    unsigned long now;
+
+    if (scanned > 0U) {
+        mode_off_raw_ms = 0UL;
+        return 0U;
+    }
+    now = millis();
+    if (mode_off_raw_ms == 0UL) {
+        mode_off_raw_ms = (now != 0UL) ? now : 1UL;
+        return 0U;
+    }
+    if ((now - mode_off_raw_ms) >= MODE_OFF_DEBOUNCE_MS) {
+        return 1U;
+    }
+    return 0U;
+}
+
 static void sw_tick_all(void) {
     sw_mode_1.tick();
     sw_mode_2.tick();
@@ -140,23 +164,50 @@ void ui_switches_init(void) {
     read_mpg_axis();
     read_mpg_scale();
 
+    /* Boot: OFF уже стоит — без ожиданий; иначе debounce в poll */
+    mode_off_raw_ms = 0UL;
+    if (scanned == 0U) {
+        sw_state.mode_off = 1U;
+        mode_off_raw_ms = (millis() != 0UL) ? millis() : 1UL;
+    } else {
+        sw_state.mode_off = 0U;
+    }
     sw_state.mode = read_mode();
     sw_state.submode = read_submode();
     sw_state.mpg_axis = latched_mpg_axis;
     sw_state.mpg_scale = latched_mpg_scale;
     last_mode = sw_state.mode;
+    last_mode_off = sw_state.mode_off;
     last_submode = sw_state.submode;
     last_mpg_axis = sw_state.mpg_axis;
     last_mpg_scale = sw_state.mpg_scale;
+    if (sw_state.mode_off) {
+        motion_jog_resume();  /* стоп осей до снятия EN */
+        motor_en_x_release();
+    }
 }
 
 void ui_switches_poll(void) {
     sw_tick_all();
 
+    uint8_t scanned = scan_mode_pin();
+    uint8_t mode_off = mode_off_debounced(scanned);
     uint8_t mode = read_mode();
     uint8_t sub = read_submode();
 
-    if (mode != last_mode) {
+    if (mode_off != last_mode_off) {
+        if (mode_off) {
+            DBG_INFO("UI", "MODE", "OFF");
+            motion_jog_resume();  /* стоп joy/MPG/go_lim до EN_X off */
+            motor_en_x_release();
+            ui_buzzer_mode_beep();
+        } else {
+            DBG_INFO_VAL("UI", "MODE", ui_switches_get_mode_name(mode), mode);
+            ui_buzzer_mode_beep();
+        }
+        last_mode_off = mode_off;
+        last_mode = mode;
+    } else if (!mode_off && mode != last_mode) {
         DBG_INFO_VAL("UI", "MODE", ui_switches_get_mode_name(mode), mode);
         ui_buzzer_mode_beep();
         last_mode = mode;
@@ -170,6 +221,7 @@ void ui_switches_poll(void) {
     }
 
     sw_state.mode = mode;
+    sw_state.mode_off = mode_off;
     sw_state.submode = sub;
     sw_state.mpg_axis = read_mpg_axis();
     sw_state.mpg_scale = read_mpg_scale();
@@ -189,6 +241,10 @@ void ui_switches_poll(void) {
 
 SwitchState_t ui_switches_get_state(void) {
     return sw_state;
+}
+
+uint8_t ui_switches_mode_off(void) {
+    return sw_state.mode_off;
 }
 
 const char *ui_switches_get_mode_name(uint8_t mode) {

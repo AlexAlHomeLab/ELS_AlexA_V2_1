@@ -101,8 +101,9 @@ description: >-
 - **GO_LIM (rapid)**: rapid + клик кнопки лимита (или rapid+limit hold) → `motion_jog_go_limit(idx)` — rapid speed, стоп при любом джойстике.
 - **Latch**: удержание джойстика в направлении + **длинное** нажатие **левой** кнопки лимита (`LIMIT_LEFT`, idx=0), если программный лимит активен в этом направлении → `motion_jog_go_limit_latch(idx)`:
   - pot-speed (не rapid), движение до лимита;
+  - при успешном старте — короткий beep (`hal_buzzer_beep_ms(40)`), как при клике лимита;
   - latch-arm: после отпускания джойстика движение продолжается;
-  - **любое** последующее включение джойстика — `go_limit_stop()`.
+  - **любое** последующее включение джойстика — `go_limit_stop()` (без beep).
 - `go_lim_active` блокирует обычный jog и РГИ.
 
 ### Остановка движения
@@ -141,6 +142,7 @@ description: >-
 - [ ] STATE_MANUAL: joy_poll; циклы: start/pause/resume через FSM
 - [ ] go_lim rapid: стоп при любом джойстике
 - [ ] latch: joy hold + LimL hold + лимит в направлении → до лимита
+- [ ] latch: beep при успешном старте (`motion_jog_go_limit_latch`)
 - [ ] Любое включение джойстика останавливает go_lim / latch-arm
 - [ ] hand_reset_axis при старте оси; блок РГИ на той же оси
 - [ ] ui_buttons: read() для удержания (не pressing после EEPROM save)

@@ -32,6 +32,18 @@
 /* --- Планировщик --- */
 #define BLOCK_BUFFER_SIZE 16             /* глубина очереди сегментов planner */
 
+/* --- Soft-latch Enable оси X (см. skill els-mode-selector) --- */
+#ifndef EN_X_SOFT_LATCH
+#define EN_X_SOFT_LATCH  1               /* 1 — lazy EN_X; 0 — пин не трогаем */
+#endif
+#ifndef EN_X_SETTLE_MS
+#define EN_X_SETTLE_MS   2               /* пауза после включения EN до STEP, мс */
+#endif
+/* MODE_OFF: сырой скан 0 должен держаться дольше перехода между 1–8 */
+#ifndef MODE_OFF_DEBOUNCE_MS
+#define MODE_OFF_DEBOUNCE_MS  150UL      /* подтверждение MODE_OFF, мс */
+#endif
+
 #if defined(__AVR__)
 #include <util/atomic.h>
 #else
@@ -73,6 +85,13 @@
 #define COORD_UNIT_MM                 1  /* отображение в мм */
 #define COORD_UNIT_INCH               2  /* отображение в дюймах */
 #define COORD_UNIT_DEFAULT            COORD_UNIT_MM  /* заводская единица CrdU */
+
+/* --- Режим отображения X: радиус / диаметр (EEPROM $47 / меню Xdia) --- */
+#define X_COORD_MODE_RADIUS           0  /* буква R, значение как радиус */
+#define X_COORD_MODE_DIAMETER         1  /* буква D, мм/дюйм ×2 на LCD */
+#ifndef X_COORD_MODE_DEFAULT
+#define X_COORD_MODE_DEFAULT          X_COORD_MODE_RADIUS  /* завод / factory reset */
+#endif
 
 /* --- Телеметрия --- */
 #define TELEMETRY_BUFFER_SIZE 64         /* размер буфера телеметрии, байт */

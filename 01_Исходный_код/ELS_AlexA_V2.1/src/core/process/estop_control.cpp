@@ -22,6 +22,7 @@ void estop_trigger(void) {
     estop_state = 1;
     fsm_force_error();
     analogWrite(SPINDLE_PWM_PIN, 0);
+    /* motor_en_x_release(); — EN_X при E-Stop пока без реализации */
     DBG_INFO("SYS", "ESTOP", "trigger");
     hal_buzzer_estop_signal();
 }

@@ -12,6 +12,8 @@
 #define DIR_X_PIN 44           /* направление DIR оси X */
 #define STEP_Z_PIN 49          /* импульс STEP оси Z (драйвер) */
 #define DIR_Z_PIN 43           /* направление DIR оси Z */
+#define EN_X_PIN 46            /* Enable драйвера X (PL3); HIGH=вкл как STEP */
+#define EN_Z_PIN 45            /* Enable драйвера Z (PL4); только объявление */
 
 /* --- LCD 2004 (LiquidCrystal) --- */
 #define LCD_D7_PIN 13          /* шина данных LCD, бит D7 */
@@ -121,6 +123,8 @@
 #define STEP_X_OFF()  HAL_PIN_LOW(STEP_X_PIN)    /* спад STEP X */
 #define STEP_Z_ON()   HAL_PIN_HIGH(STEP_Z_PIN)   /* фронт STEP Z */
 #define STEP_Z_OFF()  HAL_PIN_LOW(STEP_Z_PIN)    /* спад STEP Z */
+#define EN_X_ENABLE()  HAL_PIN_HIGH(EN_X_PIN)    /* мотор X под током */
+#define EN_X_DISABLE() HAL_PIN_LOW(EN_X_PIN)     /* мотор X выкл */
 
 #define LIMIT_UP_PIN    LIMIT_FRONT_PIN          /* алиас: лимит «вверх» по X = Front */
 #define LIMIT_DOWN_PIN  LIMIT_REAR_PIN           /* алиас: лимит «вниз» по X = Rear */

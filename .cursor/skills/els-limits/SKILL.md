@@ -87,7 +87,7 @@ description: >-
   - `hand_pos[axis] = 0` (аккумулятор РГИ);
   - `ui_encoder_reset_mpg()`;
   - `backlash_sync_axis`.
-- **Исключение LimL**: hold + джойстик в направлении активного лимита → latch (`motion_jog_go_limit_latch`) — см. `els-joy-feed`.
+- **Исключение LimL**: hold + джойстик в направлении активного лимита → latch (`motion_jog_go_limit_latch`) + короткий beep — см. `els-joy-feed`.
 
 ### GO_LIM (rapid + лимит)
 

@@ -123,11 +123,10 @@ static void div_poll_r_beep(void) {
     div_r_was_zero = is_zero;
 }
 
+/* Вход в режим: A/B/zero не трогать — живут между уходами с селектора.
+ * Сброс угла только Select (mode_divider_zero_reset). */
 void mode_divider_enter(void) {
     mode_active = 1;
-    div_a = DIVIDER_DEFAULT_PARTS;
-    div_b = 1;
-    div_zero_count = spindle_get_count();
     div_lcd_last_cnt = spindle_get_count();
     div_lcd_force = 1;
     div_sync_r_zero_state();
@@ -167,9 +166,9 @@ void mode_divider_process(void) {
     }
 }
 
+/* Select: только опорный ноль угла; A и B без изменений. */
 void mode_divider_zero_reset(void) {
     div_zero_count = spindle_get_count();
-    div_b = 1;
     div_mark_lcd_dirty();
     div_sync_r_zero_state();
     DBG_INFO_VAL_I32("DIV", "ZERO", "cnt", div_zero_count);

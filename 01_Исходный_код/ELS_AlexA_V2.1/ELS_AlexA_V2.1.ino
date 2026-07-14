@@ -63,6 +63,7 @@ typedef struct {
     uint8_t startup_busy;
     uint8_t fsm_mode;
     uint8_t sw_mode;
+    uint8_t mode_off;     /* сырой MODE_OFF */
     uint8_t sw_submode;
     uint8_t mpg_axis;
     int32_t pos_x;
@@ -73,6 +74,7 @@ typedef struct {
     uint16_t pot_filtered;
     uint8_t bl_auto;
     uint8_t joy_rapid;
+    uint32_t spindle_rpm; /* для экрана MODE_OFF */
 } LcdMainCache_t;
 
 static LcdMainCache_t lcd_cache;
@@ -149,8 +151,10 @@ static void lcd_format_decimal_num(char *dst, uint32_t whole, uint32_t frac) {
     dst[7] = 0;
 }
 
-/* Шаги → мм (или дюймы): val1000 = тысячные доли мм для lcd_format_decimal_num. */
-static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units,
+/* Шаги → мм (или дюймы): val1000 = тысячные доли для lcd_format_decimal_num.
+ * scale2: диаметр X — ×2 внутри формулы (до деления), иначе LCD только чётные 0.002.
+ * Округление к ближайшему 0.001 и для R, и для D. */
+static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units, uint8_t scale2,
                               uint32_t *whole, uint32_t *frac, int8_t *neg) {
     uint32_t abs_s = (steps < 0) ? (uint32_t)(-steps) : (uint32_t)steps;
     uint16_t ms = config_get_motor_steps(axis);
@@ -158,6 +162,7 @@ static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units,
     uint16_t pitch = config_get_screw_pitch(axis);
     uint32_t den;
     uint32_t val1000;
+    uint64_t num;
 
     *neg = (steps < 0) ? -1 : 1;
     *whole = 0;
@@ -171,8 +176,12 @@ static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units,
         return;
     }
 
-    /* uint64: abs_s×pitch×1000 не помещается в uint32 при типичном ходе оси */
-    val1000 = (uint32_t)(((uint64_t)abs_s * (uint64_t)pitch * 1000ULL) / den);
+    /* abs_s×pitch×1000 (±×2 диаметр) — в uint64; +den/2 — round к 0.001 */
+    num = (uint64_t)abs_s * (uint64_t)pitch * 1000ULL;
+    if (scale2 && units != COORD_UNIT_STEPS) {
+        num *= 2ULL;
+    }
+    val1000 = (uint32_t)((num + (uint64_t)(den / 2UL)) / (uint64_t)den);
     if (units == COORD_UNIT_INCH) {
         val1000 = (val1000 * 10000UL + 127000UL) / 254000UL;
     }
@@ -180,15 +189,18 @@ static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units,
     *frac = val1000 % 1000UL;
 }
 
-static void lcd_format_axis_field(char *dst, char axis, int32_t steps, char mark) {
+/* Поле оси 10 символов. X: буква R/D; в Xdia=диаметр мм/дюйм ×2. */
+static void lcd_format_axis_field(char *dst, uint8_t axis_id, int32_t steps, char mark) {
     uint8_t units = config_get_coord_units();
-    uint8_t axis_id = (axis == 'X') ? AXIS_X : AXIS_Z;
+    char letter = (axis_id == AXIS_X) ? config_x_coord_axis_char() : 'Z';
+    uint8_t scale2 = (axis_id == AXIS_X &&
+                      config_get_x_coord_mode() == X_COORD_MODE_DIAMETER) ? 1U : 0U;
 
     if (units == COORD_UNIT_STEPS) {
         if (steps < 0) {
-            snprintf(dst, 11, "%c-%07ld%c", axis, -(long)steps, mark);
+            snprintf(dst, 11, "%c-%07ld%c", letter, -(long)steps, mark);
         } else {
-            snprintf(dst, 11, "%c %07ld%c", axis, (long)steps, mark);
+            snprintf(dst, 11, "%c %07ld%c", letter, (long)steps, mark);
         }
         return;
     }
@@ -198,10 +210,10 @@ static void lcd_format_axis_field(char *dst, char axis, int32_t steps, char mark
     int8_t neg;
     char num[8];
 
-    lcd_steps_to_parts(steps, axis_id, units, &whole, &frac, &neg);
+    lcd_steps_to_parts(steps, axis_id, units, scale2, &whole, &frac, &neg);
     lcd_format_decimal_num(num, whole, frac);
 
-    dst[0] = axis;
+    dst[0] = letter;
     dst[1] = (neg < 0) ? '-' : ' ';
     memcpy(dst + 2, num, 7);
     dst[9] = mark;
@@ -216,9 +228,12 @@ static char lcd_backlash_flag(void) {
     return '-';
 }
 
-/* Строка 2 LCD: MPG в единицах CrdU; при Rapid — «MPG>X …», иначе «MPG X …». */
+/* Строка 2 LCD: MPG в единицах CrdU; при Rapid — «MPG>R …», иначе «MPG R …» (X→R/D). */
 static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_t joy_rapid) {
     uint8_t units = config_get_coord_units();
+    char letter = (axis_id == AXIS_X) ? config_x_coord_axis_char() : axis;
+    uint8_t scale2 = (axis_id == AXIS_X &&
+                      config_get_x_coord_mode() == X_COORD_MODE_DIAMETER) ? 1U : 0U;
     char num[8];
     uint8_t num_col;
 
@@ -226,11 +241,11 @@ static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_
     if (joy_rapid) {
         memcpy(lcd_mpg, "MPG", 3);
         lcd_mpg[3] = '>';
-        lcd_mpg[4] = axis;
+        lcd_mpg[4] = letter;
         num_col = 5;
     } else {
         memcpy(lcd_mpg, "MPG ", 4);
-        lcd_mpg[4] = axis;
+        lcd_mpg[4] = letter;
         num_col = 5;
     }
 
@@ -248,7 +263,7 @@ static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_
         uint32_t frac;
         int8_t neg;
 
-        lcd_steps_to_parts(hand, axis_id, units, &whole, &frac, &neg);
+        lcd_steps_to_parts(hand, axis_id, units, scale2, &whole, &frac, &neg);
         lcd_format_decimal_num(num, whole, frac);
         lcd_mpg[num_col] = (neg < 0) ? '-' : ' ';
         memcpy(lcd_mpg + num_col + 1, num, 7);
@@ -263,8 +278,8 @@ static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_
 static void lcd_format_coords_line(char *buf, size_t len) {
     int32_t xs = motion_get_pos_steps(AXIS_X);
     int32_t zs = motion_get_pos_steps(AXIS_Z);
-    lcd_format_axis_field(lcd_xf, 'X', xs, limits_lcd_marker(AXIS_X));
-    lcd_format_axis_field(lcd_zf, 'Z', zs, limits_lcd_marker(AXIS_Z));
+    lcd_format_axis_field(lcd_xf, AXIS_X, xs, limits_lcd_marker(AXIS_X));
+    lcd_format_axis_field(lcd_zf, AXIS_Z, zs, limits_lcd_marker(AXIS_Z));
     if (len <= LCD_COLS) {
         return;
     }
@@ -353,9 +368,39 @@ static void update_main_lcd(void) {
     ui_lcd_clear_cursor();
 }
 
+/* Вставить text по центру 20-символьной строки (пробелы по краям). */
+static void lcd_center_text(char *buf, const char *text) {
+    size_t n;
+    uint8_t pad;
+
+    memset(buf, ' ', LCD_COLS);
+    n = strlen(text);
+    if (n > LCD_COLS) n = LCD_COLS;
+    pad = (uint8_t)((LCD_COLS - n) / 2U);
+    memcpy(buf + pad, text, n);
+    buf[LCD_COLS] = 0;
+}
+
+/* Экран MODE_OFF: CNC OFF / RPM / короткая версия прошивки. */
+static void update_mode_off_lcd(void) {
+    char rpm_txt[16];
+
+    lcd_center_text(lcd_line, "CNC OFF");
+    ui_lcd_set_line_raw(0, lcd_line);
+    ui_lcd_clear_line(1);
+    snprintf(rpm_txt, sizeof(rpm_txt), "RPM %lu", (unsigned long)spindle_get_rpm());
+    lcd_center_text(lcd_line, rpm_txt);
+    ui_lcd_set_line_raw(2, lcd_line);
+    lcd_center_text(lcd_line, FIRMWARE_LCD_VER);
+    ui_lcd_set_line_raw(3, lcd_line);
+    ui_lcd_clear_cursor();
+}
+
 static void update_lcd(void) {
     if (ui_menu_is_active()) {
         ui_menu_lcd();
+    } else if (ui_switches_mode_off()) {
+        update_mode_off_lcd();
     } else if (fsm_manager_get_mode() == 6U) {
         update_divider_lcd();
     } else {
@@ -370,6 +415,7 @@ static void lcd_cache_save_main(void) {
     lcd_cache.startup_busy = planner_startup_busy();
     lcd_cache.fsm_mode = fsm_manager_get_mode();
     lcd_cache.sw_mode = sw.mode;
+    lcd_cache.mode_off = sw.mode_off;
     lcd_cache.sw_submode = sw.submode;
     lcd_cache.mpg_axis = sw.mpg_axis;
     lcd_cache.pos_x = motion_get_pos_steps(AXIS_X);
@@ -380,6 +426,7 @@ static void lcd_cache_save_main(void) {
     lcd_cache.pot_filtered = ui_pot_get_value();
     lcd_cache.bl_auto = config_backlash_get_auto_on();
     lcd_cache.joy_rapid = ui_buttons_get_state().joy_rapid;
+    lcd_cache.spindle_rpm = spindle_get_rpm();
 }
 
 /* Дешёвая проверка: форматировать только при изменении данных LCD. */
@@ -405,10 +452,12 @@ static void lcd_mark_dirty_if_changed(void) {
     long hand = (long)motion_jog_get_hand(sw.mpg_axis);
     uint16_t pot = ui_pot_get_value();
     uint8_t joy_rapid = ui_buttons_get_state().joy_rapid;
+    uint32_t rpm = spindle_get_rpm();
 
     if (startup != lcd_cache.startup_busy ||
         mode != lcd_cache.fsm_mode ||
         sw.mode != lcd_cache.sw_mode ||
+        sw.mode_off != lcd_cache.mode_off ||
         sw.submode != lcd_cache.sw_submode ||
         sw.mpg_axis != lcd_cache.mpg_axis ||
         xs != lcd_cache.pos_x ||
@@ -418,11 +467,12 @@ static void lcd_mark_dirty_if_changed(void) {
         hand != lcd_cache.hand ||
         pot != lcd_cache.pot_filtered ||
         joy_rapid != lcd_cache.joy_rapid ||
+        (sw.mode_off && rpm != lcd_cache.spindle_rpm) ||
         config_backlash_get_auto_on() != lcd_cache.bl_auto) {
         lcd_dirty = 1;
     }
 
-    if (mode == 6U && mode_divider_lcd_dirty_poll()) {
+    if (mode == 6U && !sw.mode_off && mode_divider_lcd_dirty_poll()) {
         lcd_dirty = 1;
     }
 }

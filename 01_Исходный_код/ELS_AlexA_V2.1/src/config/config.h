@@ -8,6 +8,7 @@
 
 #define FIRMWARE_NAME "ELS AlexA V2.1"   /* имя прошивки для LCD / Serial */
 #define FIRMWARE_STAGE "Stage 2.2f"      /* этап разработки (строка статуса) */
+#define FIRMWARE_LCD_VER "V2.1 Stage 2.2f" /* короткая версия для LCD MODE_OFF */
 
 #define PLATFORM_ARDUINO_MEGA 1          /* целевая плата: Arduino Mega 2560 */
 #define CPU_FREQ 16000000UL              /* частота CPU, Гц (16 МГц ATmega2560) */

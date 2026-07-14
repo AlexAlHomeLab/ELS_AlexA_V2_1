@@ -8,6 +8,7 @@
 #include "../debug/debug_serial.h"
 #include "../debug/debug_trace.h"
 #include "../process/estop_control.h"
+#include "../hal/hal_buzzer.h"
 #include "../motion/limits.h"
 #include "../ui/ui_buttons.h"
 #include "../ui/ui_encoder.h"
@@ -114,6 +115,9 @@ static int8_t mpg_adjust_tick_sign(uint8_t axis, int8_t tick_sign) {
 static int32_t jog_steps_from_delta(uint8_t axis, int32_t delta, uint8_t mpg_scale, uint8_t rapid) {
     int32_t spm;
     int32_t step;
+    /* Диаметр X: половина хода по радиусу → на LCD тот же шаг 0.01 / 0.1 диаметра */
+    uint8_t diam = (axis == AXIS_X &&
+                    config_get_x_coord_mode() == X_COORD_MODE_DIAMETER) ? 1U : 0U;
 
     if (delta == 0) return 0;
     if (delta > 1) delta = 1;
@@ -122,16 +126,16 @@ static int32_t jog_steps_from_delta(uint8_t axis, int32_t delta, uint8_t mpg_sca
     spm = (int32_t)((axis == AXIS_X) ? STEPS_PER_MM_X : STEPS_PER_MM_Z);
 
     if (rapid) {
-        step = spm / 10;
+        step = diam ? (spm / 20) : (spm / 10);  /* 0.05 мм радиуса = 0.1 диаметра */
         if (step < 1) step = 1;
         return delta > 0 ? step : -step;
     }
     if (mpg_scale == 1) {
-        step = spm / 100;
+        step = diam ? (spm / 200) : (spm / 100);  /* 0.005 мм радиуса = 0.01 диаметра */
         if (step < 1) step = 1;
         return delta > 0 ? step : -step;
     }
-    return delta;
+    return delta;  /* x1step — без учёта Xdia */
 }
 
 static float jog_speed_mm_min(uint8_t axis, uint8_t rapid) {  /* pot или rapid_speed */
@@ -499,6 +503,7 @@ void motion_jog_go_limit(uint8_t idx) {
     int32_t target;
 
     if (estop_is_triggered()) return;
+    if (ui_switches_mode_off()) return;
     if (!limits_ui_go_target(idx, &axis, &target)) return;
     if (dds_get_position(axis) == target) return;
 
@@ -517,6 +522,7 @@ void motion_jog_go_limit_latch(uint8_t idx) {
     int32_t target;
 
     if (estop_is_triggered()) return;
+    if (ui_switches_mode_off()) return;
     if (!limits_ui_go_target(idx, &axis, &target)) return;
     if (dds_get_position(axis) == target) return;
 
@@ -526,6 +532,7 @@ void motion_jog_go_limit_latch(uint8_t idx) {
     go_lim_latch = 1;
     go_lim_joy_arm = 0;
 
+    hal_buzzer_beep_ms(40);  /* подтверждение входа в защёлку */
     planner_exec_axis(axis, target, jog_speed_mm_min(axis, 0), 0);
     DBG_INFO_VAL_I32("JOG", "LATCH", "tgt", target);
 }
@@ -615,6 +622,15 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
         go_lim_active = 0;
         go_lim_latch = 0;
         go_lim_joy_arm = 0;
+        return;
+    }
+    if (ui_switches_mode_off()) {
+        if (joy_run) {
+            DBG_INFO("JOG", "JOY", "blk MODE_OFF");
+            joy_run = 0;
+        }
+        joy_z_on = 0;
+        joy_x_on = 0;
         return;
     }
 
@@ -728,6 +744,17 @@ void motion_jog_poll(void) {  /* РГИ: batch тиков, dir_lock, idle stop *
     ButtonState_t *btn = &mpg_btn;
 
     if (estop_is_triggered()) {
+        mpg_active = 0;
+        mpg_rev_cnt = 0;
+        mpg_dir_lock = 0;
+        mpg_batch_ms = 0;
+#if MPG_RAPID_MODE == MPG_RAPID_MODE_APPROACH
+        mpg_rapid_prev = 0;
+        mpg_approach_arm = 0;
+#endif
+        return;
+    }
+    if (ui_switches_mode_off()) {
         mpg_active = 0;
         mpg_rev_cnt = 0;
         mpg_dir_lock = 0;

@@ -50,13 +50,16 @@ void config_display_save(void);
 uint8_t config_get_coord_units(void);   /* COORD_UNIT_STEPS/MM/INCH */
 void config_set_coord_units(uint8_t units);
 char config_coord_unit_flag(void);      /* 'S' | 'M' | 'D' */
+uint8_t config_get_x_coord_mode(void);  /* X_COORD_MODE_RADIUS/DIAMETER */
+void config_set_x_coord_mode(uint8_t mode);
+char config_x_coord_axis_char(void);    /* 'R' | 'D' */
 ```
 
 ## Константы ui_menu.cpp
 
 | Константа | Значение | Назначение |
 |-----------|----------|------------|
-| `MENU_PARAM_COUNT` | 27 | число параметров |
+| `MENU_PARAM_COUNT` | 30 | число параметров |
 | `MENU_EDIT_LEN` | 8 | буфер edit_buf |
 | `MENU_COOLDOWN_MS` | 400 | пауза после open/exit/confirm |
 | `MENU_SEL_HOLD_MS` | 600 | long Select |
@@ -66,33 +69,36 @@ char config_coord_unit_flag(void);      /* 'S' | 'M' | 'D' */
 
 | idx | label | type | config / назначение |
 |-----|-------|------|---------------------|
-| 0 | aMin | UINT | async feed min |
-| 1 | aMax | UINT | async feed max |
-| 2 | sMin | CENTS | sync feed min |
-| 3 | sMax | CENTS | sync feed max |
-| 4 | Zstp | UINT | Z motor steps |
-| 5 | ZuSt | USTEP | Z microstep |
-| 6 | Zpit | CENTS | Z screw pitch |
-| 7 | Zmax | UINT | Z max speed mm/min |
-| 8 | Zrap | UINT | Z rapid mm/min |
-| 9 | Zacc | UINT | Z feed accel |
-| 10 | Xstp | UINT | X motor steps |
-| 11 | XuSt | USTEP | X microstep |
-| 12 | Xpit | CENTS | X screw pitch |
-| 13 | Xmax | UINT | X max speed |
-| 14 | Xrap | UINT | X rapid |
-| 15 | Xacc | UINT | X feed accel |
-| 16 | Spdl | UINT | spindle PPR |
-| 17 | Buzz | BOOL | buzzer on/off |
-| 18 | Zinv | BOOL | Z dir invert |
-| 19 | Xinv | BOOL | X dir invert |
-| 20 | BlAu | BOOL | backlash auto |
-| 21 | BlX | UINT | backlash X steps |
-| 22 | BlZ | UINT | backlash Z steps |
-| 23 | BlSp | UINT | backlash auto speed |
-| 24 | BlMn | UINT | backlash min speed |
-| 25 | Jdec | UINT | jog decel steps |
-| 26 | CrdU | UINT | 0=steps, 1=mm, 2=inch |
+| 0 | Xdia | UINT | 0=радиус(R), 1=диаметр(D); `$47` |
+| 1 | aMin | UINT | async feed min |
+| 2 | aMax | UINT | async feed max |
+| 3 | sMin | CENTS | sync feed min |
+| 4 | sMax | CENTS | sync feed max |
+| 5 | Zstp | UINT | Z motor steps |
+| 6 | ZuSt | USTEP | Z microstep |
+| 7 | Zpit | CENTS | Z screw pitch |
+| 8 | Zmax | UINT | Z max speed mm/min |
+| 9 | Zrap | UINT | Z rapid mm/min |
+| 10 | Zacc | UINT | Z feed accel |
+| 11 | Xstp | UINT | X motor steps |
+| 12 | XuSt | USTEP | X microstep |
+| 13 | Xpit | CENTS | X screw pitch |
+| 14 | Xmax | UINT | X max speed |
+| 15 | Xrap | UINT | X rapid |
+| 16 | Xacc | UINT | X feed accel |
+| 17 | Spdl | UINT | spindle PPR |
+| 18 | Buzz | BOOL | buzzer on/off |
+| 19 | Zinv | BOOL | Z dir invert |
+| 20 | Xinv | BOOL | X dir invert |
+| 21 | BlEn | BOOL | backlash enable |
+| 22 | BlAu | BOOL | backlash auto |
+| 23 | BlX | UINT | backlash X steps |
+| 24 | BlZ | UINT | backlash Z steps |
+| 25 | BlSp | UINT | backlash auto speed |
+| 26 | BlMn | UINT | backlash min speed |
+| 27 | Jdec | UINT | jog decel steps |
+| 28 | CrdU | UINT | 0=steps, 1=mm, 2=inch |
+| 29 | dEFt | ACTION | factory reset |
 
 Формат строки списка: `"%c%-5s %s"` — маркер `>`, label 5 символов, value.
 
@@ -112,16 +118,18 @@ lcd_format_status_line(mode_name, feed_txt, submode_short, buf);
 lcd_format_mpg_line(axis, motion_jog_get_hand(mpg_axis));
 
 // Строка 3
-lcd_format_axis_field(lcd_xf, 'X', xs, limits_lcd_marker(AXIS_X));
-lcd_format_axis_field(lcd_zf, 'Z', zs, limits_lcd_marker(AXIS_Z));
+lcd_format_axis_field(lcd_xf, AXIS_X, xs, limits_lcd_marker(AXIS_X));
+lcd_format_axis_field(lcd_zf, AXIS_Z, zs, limits_lcd_marker(AXIS_Z));
 snprintf(buf, "%s%s", lcd_xf, lcd_zf);  // 10+10 = 20 cols
 ```
 
 ### Поле оси (10 символов)
 
-**Steps:** `X 0071234<` или `X-0071234<`
+Буква оси X = `config_x_coord_axis_char()` (`R`/`D`). В Xdia=диаметр: ×2 в числителе `lcd_steps_to_parts` до деления + round к 0.001 (квант 0.001 и для R, и для D).
 
-**mm/inch:** `X␠12.345␠<` — 7 символов числа, mark на pos 9.
+**Steps:** `R 0071234<` или `R-0071234<` (шаги без ×2)
+
+**mm/inch:** `R␠12.345␠<` — 7 символов числа, mark на pos 9.
 
 ### Feed (ui_pot.cpp)
 
@@ -162,17 +170,21 @@ menu_active + EDIT:
 
 | Addr | Поле |
 |------|------|
-| 70 | magic 0xD1 |
+| 70 | magic `0xD2` |
 | 71 | coord_units |
-| 72 | checksum |
+| 72 | x_coord_mode (Xdia) |
+| 73 | checksum |
+
+Миграция с magic `0xD1` (только CrdU): Xdia ← `X_COORD_MODE_DEFAULT`.
 
 ## Отладка
 
-Serial: `UI/MENU open|exit`, `CFG/DSP loaded|saved|migr|defaults`
+Serial: `UI/MENU open|exit`, `CFG/DSP loaded|saved|migr|defaults`; `$47` Xdia
 
 ## Проверка после правок
 
 1. Главный экран: смена mode/submode, pot feed, MPG, coords при jog/MPG.
 2. CrdU 0/1/2 — flag и формат чисел.
-3. Меню: scroll 27 params, edit всех типов, save → reboot → значения сохранены.
-4. Exit menu → jog/joy работает (reset_joy).
+3. Xdia 0/1 — буква R/D; мм ×2 до /den + round 0.001; шаги без ×2; MPG X.
+4. Меню: scroll 30 params (Xdia первый), edit, save → reboot.
+5. Exit menu → jog/joy работает (reset_joy).

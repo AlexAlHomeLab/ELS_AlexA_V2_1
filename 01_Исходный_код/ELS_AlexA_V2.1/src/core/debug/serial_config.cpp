@@ -95,6 +95,7 @@ static int setting_get(uint8_t id, char *buf, size_t len) {
     case 45: snprintf(buf, len, "%u", config_backlash_get_min_speed()); return 1;
     case 46: snprintf(buf, len, "%u", config_backlash_get_enabled()); return 1;
     case 44: snprintf(buf, len, "%u", config_get_coord_units()); return 1;
+    case 47: snprintf(buf, len, "%u", config_get_x_coord_mode()); return 1;
     default: return 0;
     }
 }
@@ -267,6 +268,12 @@ static int setting_set(uint8_t id, const char *val) {
         config_set_coord_units((uint8_t)u16);
         config_display_save();
         return 1;
+    case 47:
+        if (!parse_u16(val, &u16)) return 0;
+        if (u16 > X_COORD_MODE_DIAMETER) return 0;
+        config_set_x_coord_mode((uint8_t)u16);
+        config_display_save();
+        return 1;
     default:
         return 0;
     }
@@ -287,8 +294,8 @@ static void print_all_settings(void) {
         10, 11, 12, 13, 14, 15, 16, 17,
         20, 21, 22, 23, 24, 25, 26, 27,
         30, 31, 32,
-        40, 41, 42, 43, 45,
-        44
+        40, 41, 42, 43, 45, 46,
+        44, 47
     };
     for (uint8_t i = 0; i < sizeof(ids); i++) {
         print_setting(ids[i]);
@@ -320,6 +327,7 @@ static void cmd_help(void) {
     Serial.println(F("$45 backlash min speed mm/min"));
     Serial.println(F("$46 backlash enable (BlEn)"));
     Serial.println(F("$44 coord units 0=steps 1=mm 2=inch"));
+    Serial.println(F("$47 X display 0=radius 1=diameter"));
     Serial.println(F("$$ all, $n query, $n=val set, $I info, ? status"));
 }
 

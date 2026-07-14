@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MENU_PARAM_COUNT 29
+#define MENU_PARAM_COUNT 30
 #define MENU_EDIT_LEN 8
 
 #define MENU_MODE_BROWSE 0
@@ -64,6 +64,7 @@ static uint16_t edit_bl_z = BACKLASH_Z_STEPS_DEFAULT;
 static uint16_t edit_bl_speed = BACKLASH_AUTO_SPEED_DEFAULT;
 static uint16_t edit_bl_min_speed = BACKLASH_MIN_SPEED_DEFAULT;
 static uint8_t edit_coord_units = COORD_UNIT_DEFAULT;
+static uint8_t edit_x_coord_mode = X_COORD_MODE_DEFAULT;  /* Xdia: 0=R 1=D */
 
 
 typedef enum {
@@ -82,6 +83,7 @@ typedef struct {
 } ParamDef_t;
 
 static const ParamDef_t param_def[MENU_PARAM_COUNT] = {
+    {"Xdia", PTYPE_UINT, 0, 1},  /* 0=радиус(R), 1=диаметр(D) */
     {"aMin", PTYPE_UINT, CONFIG_FEED_ASYNC_EDIT_MIN_LOW, CONFIG_FEED_ASYNC_EDIT_MIN_HIGH},
     {"aMax", PTYPE_UINT, CONFIG_FEED_ASYNC_EDIT_MAX_LOW, CONFIG_FEED_ASYNC_EDIT_MAX_HIGH},
     {"sMin", PTYPE_CENTS, CONFIG_FEED_SYNC_EDIT_MIN_LOW, CONFIG_FEED_SYNC_EDIT_MIN_HIGH},
@@ -120,40 +122,41 @@ static void ui_buzzer_beep(void) {
 
 static uint16_t *menu_param_ptr_u16(uint8_t idx) {
     switch (idx) {
-    case 0: return &edit_async_min;
-    case 1: return &edit_async_max;
-    case 2: return &edit_sync_min;
-    case 3: return &edit_sync_max;
-    case 4: return &edit_z_steps;
-    case 6: return &edit_z_pitch;
-    case 7: return &edit_z_max;
-    case 8: return &edit_z_rapid;
-    case 10: return &edit_x_steps;
-    case 12: return &edit_x_pitch;
-    case 13: return &edit_x_max;
-    case 14: return &edit_x_rapid;
-    case 16: return &edit_spindle_ppr;
-    case 22: return &edit_bl_x;
-    case 23: return &edit_bl_z;
-    case 24: return &edit_bl_speed;
-    case 25: return &edit_bl_min_speed;
-    case 26: return &edit_jog_decel;
+    case 1: return &edit_async_min;
+    case 2: return &edit_async_max;
+    case 3: return &edit_sync_min;
+    case 4: return &edit_sync_max;
+    case 5: return &edit_z_steps;
+    case 7: return &edit_z_pitch;
+    case 8: return &edit_z_max;
+    case 9: return &edit_z_rapid;
+    case 11: return &edit_x_steps;
+    case 13: return &edit_x_pitch;
+    case 14: return &edit_x_max;
+    case 15: return &edit_x_rapid;
+    case 17: return &edit_spindle_ppr;
+    case 23: return &edit_bl_x;
+    case 24: return &edit_bl_z;
+    case 25: return &edit_bl_speed;
+    case 26: return &edit_bl_min_speed;
+    case 27: return &edit_jog_decel;
     default: return NULL;
     }
 }
 
 static uint8_t *menu_param_ptr_u8(uint8_t idx) {
     switch (idx) {
-    case 5: return &edit_z_ustep;
-    case 9: return &edit_z_accel;
-    case 11: return &edit_x_ustep;
-    case 15: return &edit_x_accel;
-    case 17: return &edit_buzzer;
-    case 18: return &edit_z_dir_inv;
-    case 19: return &edit_x_dir_inv;
-    case 20: return &edit_bl_en;
-    case 21: return &edit_bl_auto;
-    case 27: return &edit_coord_units;
+    case 0: return &edit_x_coord_mode;
+    case 6: return &edit_z_ustep;
+    case 10: return &edit_z_accel;
+    case 12: return &edit_x_ustep;
+    case 16: return &edit_x_accel;
+    case 18: return &edit_buzzer;
+    case 19: return &edit_z_dir_inv;
+    case 20: return &edit_x_dir_inv;
+    case 21: return &edit_bl_en;
+    case 22: return &edit_bl_auto;
+    case 28: return &edit_coord_units;
     default: return NULL;
     }
 }
@@ -205,6 +208,7 @@ static void menu_load_values(void) {
     edit_bl_min_speed = config_backlash_get_min_speed();
     edit_jog_decel = config_get_jog_decel_steps();
     edit_coord_units = config_get_coord_units();
+    edit_x_coord_mode = config_get_x_coord_mode();
 }
 
 static void menu_value_to_edit_buf(uint8_t idx) {
@@ -442,6 +446,17 @@ static void menu_edit_digit_delta(int8_t dir) {
         return;
     }
     menu_edit_uint_digit_delta(dir);
+    /* Live clamp: иначе Xdia/CrdU уходят за max до confirm */
+    {
+        uint16_t v = (uint16_t)atol(edit_buf);
+        if (v < d->min_v || v > d->max_v) {
+            if (v > d->max_v) v = d->max_v;
+            if (v < d->min_v) v = d->min_v;
+            menu_param_set_u16(param_idx, v);
+            menu_value_to_edit_buf(param_idx);
+            menu_edit_find_first_digit();
+        }
+    }
 }
 
 static void menu_format_list_line(uint8_t idx, char *buf, size_t len) {
@@ -599,6 +614,7 @@ static void menu_save_all(void) {
     }
 
     config_set_coord_units((uint8_t)edit_coord_units);
+    config_set_x_coord_mode(edit_x_coord_mode);
     config_display_save();
 
     config_set_buzzer_on(edit_buzzer);

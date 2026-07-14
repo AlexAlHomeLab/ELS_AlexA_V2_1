@@ -89,11 +89,11 @@ static int32_t joy_chunk(uint8_t axis, uint8_t rapid) {
 ```
 Rapid click + limit pressed     → motion_jog_go_limit(idx)     [rapid speed]
 Limit click + rapid held        → motion_jog_go_limit(idx)
-Limit LEFT hold + joy in dir    → motion_jog_go_limit_latch()  [pot speed, latch]
+Limit LEFT hold + joy in dir    → motion_jog_go_limit_latch()  [pot speed, latch, beep 40 ms]
 ```
 
 Проверка направления: `limits_ui_go_target_dir(axis, sign, &lim_idx, &target)`.
-
+Beep latch: `hal_buzzer_beep_ms(40)` внутри `motion_jog_go_limit_latch` при успешном старте.
 ## FSM
 
 ```c

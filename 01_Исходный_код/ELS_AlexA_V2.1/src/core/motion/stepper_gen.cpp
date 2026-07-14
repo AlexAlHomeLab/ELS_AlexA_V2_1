@@ -2,6 +2,7 @@
 #include "../hal/hal_pins.h"
 #include "backlash.h"
 #include "limits.h"
+#include "motor_en.h"
 #include "../debug/debug_serial.h"
 #include "../debug/debug_trace.h"
 #include "../../config/config.h"
@@ -626,6 +627,17 @@ void dds_motion_start(const MotionCommand_t *cmd) {  /* backlash / jog cruise / 
 
     if (!cmd) return;
 
+#if EN_X_SOFT_LATCH
+    /* Soft-latch EN_X до cli(): delay settle недопустим в критической секции */
+    if (cmd->flags & MOTION_FLAG_BACKLASH) {
+        if (cmd->bl_axis == AXIS_X && cmd->bl_steps > 0) {
+            motor_en_x_ensure();
+        }
+    } else if (cmd->target_x != dds_get_position(AXIS_X)) {
+        motor_en_x_ensure();
+    }
+#endif
+
     sreg = SREG;
     cli();
 
@@ -840,6 +852,12 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {  /* смена ц�
     if (!cmd || !(cmd->flags & MOTION_FLAG_JOG)) return 0U;
     if (!motion_prof.active || !(motion_prof.flags & MOTION_FLAG_JOG)) return 0U;
     if ((cmd->flags & MOTION_FLAG_JOG_CRUISE) && !motion_prof.jog_cruise) return 0U;
+
+#if EN_X_SOFT_LATCH
+    if (cmd->target_x != dds_get_position(AXIS_X)) {
+        motor_en_x_ensure();
+    }
+#endif
 
     sreg = SREG;
     cli();
