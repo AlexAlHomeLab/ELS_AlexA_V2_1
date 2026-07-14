@@ -72,6 +72,7 @@ typedef struct {
     long hand;
     uint16_t pot_filtered;
     uint8_t bl_auto;
+    uint8_t joy_rapid;
 } LcdMainCache_t;
 
 static LcdMainCache_t lcd_cache;
@@ -215,24 +216,33 @@ static char lcd_backlash_flag(void) {
     return '-';
 }
 
-/* Строка 2 LCD: MPG в единицах CrdU, 20 символов без \0 внутри. */
-static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id) {
+/* Строка 2 LCD: MPG в единицах CrdU; при Rapid — «MPG>X …», иначе «MPG X …». */
+static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_t joy_rapid) {
     uint8_t units = config_get_coord_units();
     char num[8];
+    uint8_t num_col;
 
     memset(lcd_mpg, ' ', LCD_COLS);
-    memcpy(lcd_mpg, "MPG ", 4);
-    lcd_mpg[4] = axis;
+    if (joy_rapid) {
+        memcpy(lcd_mpg, "MPG", 3);
+        lcd_mpg[3] = '>';
+        lcd_mpg[4] = axis;
+        num_col = 5;
+    } else {
+        memcpy(lcd_mpg, "MPG ", 4);
+        lcd_mpg[4] = axis;
+        num_col = 5;
+    }
 
     if (units == COORD_UNIT_STEPS) {
         if (hand < 0) {
-            lcd_mpg[5] = '-';
+            lcd_mpg[num_col] = '-';
             snprintf(num, sizeof(num), "%07ld", -(long)hand);
         } else {
-            lcd_mpg[5] = ' ';
+            lcd_mpg[num_col] = ' ';
             snprintf(num, sizeof(num), "%07ld", (long)hand);
         }
-        memcpy(lcd_mpg + 6, num, 7);
+        memcpy(lcd_mpg + num_col + 1, num, 7);
     } else {
         uint32_t whole;
         uint32_t frac;
@@ -240,8 +250,8 @@ static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id) {
 
         lcd_steps_to_parts(hand, axis_id, units, &whole, &frac, &neg);
         lcd_format_decimal_num(num, whole, frac);
-        lcd_mpg[5] = (neg < 0) ? '-' : ' ';
-        memcpy(lcd_mpg + 6, num, 7);
+        lcd_mpg[num_col] = (neg < 0) ? '-' : ' ';
+        memcpy(lcd_mpg + num_col + 1, num, 7);
     }
 
     lcd_mpg[LCD_COLS - 2] = config_coord_unit_flag();
@@ -324,6 +334,7 @@ static void update_main_lcd(void) {
 
     SwitchState_t sw = ui_switches_get_state();
     uint8_t mode = fsm_manager_get_mode();
+    ButtonState_t btn = ui_buttons_get_state();
 
     ui_pot_feed_format(lcd_feed_txt, sizeof(lcd_feed_txt), mode);
     lcd_format_status_line(ui_switches_get_mode_name(sw.mode),
@@ -333,7 +344,7 @@ static void update_main_lcd(void) {
     ui_lcd_set_line(0, lcd_line);
 
     char axis = (sw.mpg_axis == AXIS_X) ? 'X' : 'Z';
-    lcd_format_mpg_line(axis, motion_jog_get_hand(sw.mpg_axis), sw.mpg_axis);
+    lcd_format_mpg_line(axis, motion_jog_get_hand(sw.mpg_axis), sw.mpg_axis, btn.joy_rapid);
     ui_lcd_set_line_raw(1, lcd_mpg);
     ui_lcd_clear_line(2);
 
@@ -368,6 +379,7 @@ static void lcd_cache_save_main(void) {
     lcd_cache.hand = (long)motion_jog_get_hand(sw.mpg_axis);
     lcd_cache.pot_filtered = ui_pot_get_value();
     lcd_cache.bl_auto = config_backlash_get_auto_on();
+    lcd_cache.joy_rapid = ui_buttons_get_state().joy_rapid;
 }
 
 /* Дешёвая проверка: форматировать только при изменении данных LCD. */
@@ -392,6 +404,7 @@ static void lcd_mark_dirty_if_changed(void) {
     char mz = limits_lcd_marker(AXIS_Z);
     long hand = (long)motion_jog_get_hand(sw.mpg_axis);
     uint16_t pot = ui_pot_get_value();
+    uint8_t joy_rapid = ui_buttons_get_state().joy_rapid;
 
     if (startup != lcd_cache.startup_busy ||
         mode != lcd_cache.fsm_mode ||
@@ -404,6 +417,7 @@ static void lcd_mark_dirty_if_changed(void) {
         mz != lcd_cache.mark_z ||
         hand != lcd_cache.hand ||
         pot != lcd_cache.pot_filtered ||
+        joy_rapid != lcd_cache.joy_rapid ||
         config_backlash_get_auto_on() != lcd_cache.bl_auto) {
         lcd_dirty = 1;
     }

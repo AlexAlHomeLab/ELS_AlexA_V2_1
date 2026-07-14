@@ -45,7 +45,8 @@ description: >-
 | Логика | `motion_jog.cpp` | `motion_jog_poll()`, `hand_pos[]`, `mpg_cmd[]` |
 | Движение | `planner.cpp` | `planner_exec_jog(..., "MPG", cruise=1)` |
 | FSM | `fsm_manager.cpp` | РГИ только при `STATE_MANUAL` |
-| Лимиты | `limits.cpp` | `limits_clamp_steps()` |
+| Конфиг | `config_mpg.h` | `MPG_RAPID_MODE`, скорости РГИ по режимам |
+| LCD | `ELS_AlexA_V2.1.ino` | строка MPG, маркер `>` при Rapid |
 
 ## Масштаб импульса
 
@@ -57,7 +58,35 @@ description: >-
 | `mpg_scale == 1`, без Rapid | `STEPS_PER_MM / 100` (0.01 мм) |
 | Rapid (`btn.joy_rapid`) | `STEPS_PER_MM / 10` (0.1 мм) |
 
+### Режим Rapid + РГИ (`config_mpg.h`)
+
+Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH`).
+
+| Режим | Поведение при Rapid + вращении РГИ |
+|-------|-------------------------------------|
+| `MPG_RAPID_MODE_LIVE` | 0.1 мм/тик, движение сразу (`planner_exec_jog`, cruise=1), лимиты не clamp |
+| `MPG_RAPID_MODE_APPROACH` | 0.1 мм/тик, **только смена цели** (`mpg_cmd`); движение при **отпускании** Rapid (`cruise=0`, подача pot) |
+
+- LCD: при нажатом Rapid строка MPG — `MPG>X …` / `MPG>Z …` (символ `>` после «MPG»).
+- В APPROACH при наборе цели лимиты **clamp** (в отличие от LIVE).
+- Фронт Rapid ↑: `hand_pos=0`, `mpg_cmd=position`, стоп активного MPG.
+- Фронт Rapid ↓: `mpg_approach_release()` → подвод к `mpg_cmd`.
+- Смена оси / halt: `mpg_rapid_prev=0` — при удержании Rapid повторный arm на новой оси.
+
 Селекторы: `ui_switches` — `mpg_scale` 0 = x1step (D15 LOW), 1 = 0.01mm (D14 LOW).
+
+## Скорости РГИ (`config_mpg.h`)
+
+Отдельные compile-time константы **мм/мин** по оси X/Z; в рантайме `mpg_speed_mm_min()` clamp к `max_speed` оси. Джойстик и pot **не** используются для РГИ.
+
+| Режим | Условие | Константы |
+|-------|---------|-----------|
+| 1:1 | `mpg_scale==0`, без Rapid | `MPG_SPEED_X1_X/Z_MM_MIN` |
+| 0.01 мм | `mpg_scale==1`, без Rapid | `MPG_SPEED_001_X/Z_MM_MIN` |
+| 0.1 мм LIVE | Rapid + `MPG_RAPID_MODE_LIVE` | `MPG_SPEED_01_LIVE_X/Z_MM_MIN` |
+| Точный подвод | отпускание Rapid в APPROACH | `MPG_SPEED_APPROACH_X/Z_MM_MIN` |
+
+Реализация: `mpg_speed_mm_min(axis, mpg_scale, rapid, approach)` в `motion_jog.cpp`; все `planner_exec_jog(..., "MPG", ...)` берут скорость оттуда.
 
 ## Правила реализации
 
@@ -97,8 +126,8 @@ description: >-
 
 ### Параметры движения РГИ
 
-- Отдельные от джойстика: скорость, разгон, торможение (из `config_machine` или отдельные поля `mpg_*` в конфиге).
-- Сейчас скорость: `jog_speed_mm_min(axis, rapid)` — при доработке вынести `mpg_speed_mm_min()`.
+- Скорость: `mpg_speed_mm_min()` — константы в `config_mpg.h` по режиму масштаба/Rapid/подвода; clamp к `max_speed` оси.
+- Разгон/торможение — общие `feed_accel` оси (как у джойстика).
 - Cruise-режим planner (`MOTION_FLAG_JOG_CRUISE`) обеспечивает «одно движение» при обгоне цели.
 
 ### Конфликт с джойстиком
@@ -110,12 +139,13 @@ description: >-
 ```
 - [ ] РГИ только STATE_MANUAL, не в циклах
 - [ ] Масштаб: 1 step / 0.01 mm / 0.1 mm (Rapid)
+- [ ] MPG_RAPID_MODE: LIVE vs APPROACH; LCD `>` при Rapid
 - [ ] Лимиты: clamp цели и фактические шаги в hand_pos
 - [ ] Накопление mpg_cmd при серии импульсов
 - [ ] cruise=1 в planner_exec_jog для MPG
 - [ ] hand_pos сброс только при старте джойстика по оси
 - [ ] Антидребезг: consume по 1 тику; reverse ≤N игнор, >N полный стоп
-- [ ] Отдельные параметры движения РГИ (если в задаче)
+- [x] Отдельные скорости РГИ: `MPG_SPEED_*` в config_mpg.h, `mpg_speed_mm_min()`
 - [ ] Минимальный diff, одна зона за раз
 - [ ] Производительность ISR: без тяжёлой логики в прерывании
 ```

@@ -41,6 +41,25 @@ void    motion_jog_reset_pos(uint8_t axis);
 | `MPG_LOOKAHEAD` | 4 | Множитель runway |
 | `MPG_IDLE_STOP_MS` | 80 | Пауза до финиша MPG-движения |
 
+## config_mpg.h
+
+| Константа | Значение | Назначение |
+|-----------|----------|------------|
+| `MPG_RAPID_MODE_LIVE` | 0 | Rapid+РГИ: 0.1 мм, движение сразу |
+| `MPG_RAPID_MODE_APPROACH` | 1 | Точный подвод: цель при Rapid, ход при отпускании |
+| `MPG_RAPID_MODE` | APPROACH | Активный режим (compile-time) |
+
+### Скорости РГИ (мм/мин, compile-time)
+
+| Константа | Режим |
+|-----------|-------|
+| `MPG_SPEED_X1_X/Z_MM_MIN` | 1 шаг/тик |
+| `MPG_SPEED_001_X/Z_MM_MIN` | 0.01 мм/тик |
+| `MPG_SPEED_01_LIVE_X/Z_MM_MIN` | Rapid 0.1 мм, LIVE |
+| `MPG_SPEED_APPROACH_X/Z_MM_MIN` | подвод APPROACH |
+
+Рантайм: `mpg_speed_mm_min(axis, mpg_scale, rapid, approach)` в `motion_jog.cpp`.
+
 ## Состояние MPG в motion_jog.cpp
 
 | Переменная | Назначение |
@@ -60,7 +79,7 @@ motion_jog_poll (STATE_MANUAL only)
        ↓
 consume ticks → jog_steps_from_delta → mpg_cmd += steps
        ↓
-limits_clamp → planner_exec_jog(tx,tz, speed, "MPG", cruise=1)
+limits_clamp → planner_exec_jog(tx,tz, mpg_speed_mm_min(...), "MPG", cruise=1)
        ↓
 dds_motion (cruise retarget) → шаговые импульсы
 ```
@@ -94,7 +113,7 @@ if (st == STATE_MANUAL) {
 
 1. `MPG_REV_IGNORE_TICKS` (N) — логика игнора/стопа при смене направления
 2. `hand_pos` при лимите — только фактические шаги
-3. Отдельные `mpg_accel` / `mpg_speed` / `mpg_decel` в config_machine
+3. Отдельные `mpg_accel` / `mpg_decel` (если скорости по режимам потребуют другой профиль)
 
 ## Отладка
 

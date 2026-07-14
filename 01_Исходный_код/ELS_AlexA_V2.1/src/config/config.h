@@ -46,6 +46,7 @@
 #define STEP_ISR_FREQ_HZ (1000000UL / STEP_ISR_PERIOD_US) /* частота ISR, Гц */
 
 #include "config_defs.h"
+#include "config_mpg.h"
 #include "config_machine.h"
 #include "config_backlash.h"
 #include "config_lcd.h"
