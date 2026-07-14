@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MENU_PARAM_COUNT 28
+#define MENU_PARAM_COUNT 29
 #define MENU_EDIT_LEN 8
 
 #define MENU_MODE_BROWSE 0
@@ -57,6 +57,7 @@ static uint8_t edit_x_dir_inv = AXIS_X_DIR_INVERT_DEFAULT;
 static uint16_t edit_spindle_ppr = SPINDLE_PPR_DEFAULT;
 static uint16_t edit_jog_decel = JOG_DECEL_STEPS_DEFAULT;
 static uint8_t edit_buzzer = CONFIG_BUZZER_DEFAULT;
+static uint8_t edit_bl_en = BACKLASH_ENABLE_DEFAULT;  /* BlEn: вкл компенсации */
 static uint8_t edit_bl_auto = BACKLASH_AUTO_DEFAULT;
 static uint16_t edit_bl_x = BACKLASH_X_STEPS_DEFAULT;
 static uint16_t edit_bl_z = BACKLASH_Z_STEPS_DEFAULT;
@@ -101,6 +102,7 @@ static const ParamDef_t param_def[MENU_PARAM_COUNT] = {
     {"Buzz", PTYPE_BOOL, 0, 1},
     {"Zinv", PTYPE_BOOL, 0, 1},
     {"Xinv", PTYPE_BOOL, 0, 1},
+    {"BlEn", PTYPE_BOOL, 0, 1},
     {"BlAu", PTYPE_BOOL, 0, 1},
     {"BlX", PTYPE_UINT, 0, BACKLASH_STEPS_MAX},
     {"BlZ", PTYPE_UINT, 0, BACKLASH_STEPS_MAX},
@@ -131,11 +133,11 @@ static uint16_t *menu_param_ptr_u16(uint8_t idx) {
     case 13: return &edit_x_max;
     case 14: return &edit_x_rapid;
     case 16: return &edit_spindle_ppr;
-    case 21: return &edit_bl_x;
-    case 22: return &edit_bl_z;
-    case 23: return &edit_bl_speed;
-    case 24: return &edit_bl_min_speed;
-    case 25: return &edit_jog_decel;
+    case 22: return &edit_bl_x;
+    case 23: return &edit_bl_z;
+    case 24: return &edit_bl_speed;
+    case 25: return &edit_bl_min_speed;
+    case 26: return &edit_jog_decel;
     default: return NULL;
     }
 }
@@ -149,8 +151,9 @@ static uint8_t *menu_param_ptr_u8(uint8_t idx) {
     case 17: return &edit_buzzer;
     case 18: return &edit_z_dir_inv;
     case 19: return &edit_x_dir_inv;
-    case 20: return &edit_bl_auto;
-    case 26: return &edit_coord_units;
+    case 20: return &edit_bl_en;
+    case 21: return &edit_bl_auto;
+    case 27: return &edit_coord_units;
     default: return NULL;
     }
 }
@@ -194,6 +197,7 @@ static void menu_load_values(void) {
     edit_x_dir_inv = config_get_dir_invert(AXIS_X);
     edit_spindle_ppr = config_get_spindle_ppr();
     edit_buzzer = config_get_buzzer_on();
+    edit_bl_en = config_backlash_get_enabled();
     edit_bl_auto = config_backlash_get_auto_on();
     edit_bl_x = config_backlash_get_steps_x();
     edit_bl_z = config_backlash_get_steps_z();
@@ -581,6 +585,7 @@ static void menu_save_all(void) {
     config_set_jog_decel_steps(edit_jog_decel);
     config_machine_save();
 
+    config_backlash_set_enabled(edit_bl_en);
     config_backlash_set_auto_on(edit_bl_auto);
     config_backlash_set_steps_x(edit_bl_x);
     config_backlash_set_steps_z(edit_bl_z);
@@ -588,6 +593,10 @@ static void menu_save_all(void) {
     config_backlash_set_min_speed(edit_bl_min_speed);
     config_backlash_save();
     backlash_reload_steps();
+    /* BlEn=0 — сброс незавершённой выборки; synced сохраняется */
+    if (!edit_bl_en) {
+        backlash_abort_pending();
+    }
 
     config_set_coord_units((uint8_t)edit_coord_units);
     config_display_save();

@@ -3,11 +3,12 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-#define EEPROM_DISPLAY_MAGIC      0xD1
-#define EEPROM_DISPLAY_ADDR       70
-#define EEPROM_DISPLAY_ADDR_SUM   72
-#define EEPROM_DISPLAY_ADDR_OLD   64   /* миграция со старого адреса */
-#define EEPROM_DISPLAY_ADDR_SUM_OLD 66
+#define EEPROM_DISPLAY_MAGIC      0xD1   /* сигнатура блока CrdU / display */
+#define EEPROM_DISPLAY_ADDR       70     /* адрес units (COORD_UNIT_*) */
+#define EEPROM_DISPLAY_ADDR_SUM   72     /* адрес checksum */
+#define EEPROM_DISPLAY_ADDR_OLD   64     /* старый адрес units (миграция) */
+#define EEPROM_DISPLAY_ADDR_SUM_OLD 66   /* старый адрес checksum */
+
 
 static uint8_t coord_units = COORD_UNIT_DEFAULT;  /* COORD_UNIT_* */
 

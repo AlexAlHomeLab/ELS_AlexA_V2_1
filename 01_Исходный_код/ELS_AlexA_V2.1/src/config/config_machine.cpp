@@ -4,10 +4,11 @@
 #include <EEPROM.h>
 
 /* EEPROM machine block: magic@32, data@33, sum@55 */
-#define EEPROM_MACHINE_MAGIC 0xC5
-#define EEPROM_MACHINE_ADDR_MAGIC 32
-#define EEPROM_MACHINE_ADDR_DATA 33
-#define EEPROM_MACHINE_ADDR_SUM 55
+#define EEPROM_MACHINE_MAGIC 0xC5        /* сигнатура блока параметров станка */
+#define EEPROM_MACHINE_ADDR_MAGIC 32     /* адрес magic */
+#define EEPROM_MACHINE_ADDR_DATA 33      /* адрес структуры осей + шпиндель */
+#define EEPROM_MACHINE_ADDR_SUM 55       /* адрес checksum блока */
+
 
 /* Сырые параметры одной оси в EEPROM */
 typedef struct {

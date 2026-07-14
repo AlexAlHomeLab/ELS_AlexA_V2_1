@@ -354,7 +354,11 @@ uint8_t backlash_consume_step(uint8_t axis, uint8_t dir)  /* 1 = шаг «съе
 
 uint8_t backlash_enabled(void)
 {
-    return ENABLE_BACKLASH ? 1U : 0U;
+    /* Компиляция (ENABLE_BACKLASH) и рантайм (меню BlEn) */
+    if (!ENABLE_BACKLASH) {
+        return 0U;
+    }
+    return config_backlash_get_enabled() ? 1U : 0U;
 }
 
 void backlash_set_steps(uint8_t axis, int32_t steps)

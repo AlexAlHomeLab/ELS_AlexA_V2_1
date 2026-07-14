@@ -10,11 +10,11 @@
 extern "C" {
 #endif
 
-#define CONFIG_EEPROM_MAGIC   0xA5
-#define CONFIG_FEED_MAX_DEFAULT 100   /* % ограничения подачи (legacy) */
-#define CONFIG_FEED_MAX_MIN     10
-#define CONFIG_FEED_MAX_LIMIT   100
-#define CONFIG_BUZZER_DEFAULT   1     /* зуммер вкл по умолчанию */
+#define CONFIG_EEPROM_MAGIC   0xA5       /* сигнатура блока 0..3 (валидность EEPROM) */
+#define CONFIG_FEED_MAX_DEFAULT 100      /* % ограничения подачи (legacy), завод */
+#define CONFIG_FEED_MAX_MIN     10       /* мин. % ограничения подачи в меню */
+#define CONFIG_FEED_MAX_LIMIT   100      /* макс. % ограничения подачи */
+#define CONFIG_BUZZER_DEFAULT   1        /* 1 — зуммер вкл по умолчанию */
 
 void config_load(void);   /* все подсистемы config_*_load */
 void config_save(void);   /* только блок 0..3 (feed_max, buzzer) */

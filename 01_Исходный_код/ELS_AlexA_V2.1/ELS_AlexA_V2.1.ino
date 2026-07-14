@@ -207,9 +207,9 @@ static void lcd_format_axis_field(char *dst, char axis, int32_t steps, char mark
     dst[10] = 0;
 }
 
-/* Символ режима люфта в col 19: '-' выкл, 'K' вкл (BlAu). */
+/* Символ компенсации люфта в col 19: 'K' если BlEn вкл (и ENABLE_BACKLASH), иначе '-'. */
 static char lcd_backlash_flag(void) {
-    if (backlash_enabled() && config_backlash_get_auto_on()) {
+    if (backlash_enabled()) {
         return 'K';
     }
     return '-';

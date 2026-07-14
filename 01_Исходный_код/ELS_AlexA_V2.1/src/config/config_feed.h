@@ -10,30 +10,30 @@
 extern "C" {
 #endif
 
-#define CONFIG_FEED_RANGE_COUNT 2
-#define CONFIG_FEED_MODE_COUNT 8
-#define CONFIG_FEED_MODE_ASYNC  0
-#define CONFIG_FEED_MODE_SYNC   1
-#define CONFIG_FEED_MODE_THREAD 2
+#define CONFIG_FEED_RANGE_COUNT 2        /* число диапазонов: async + sync */
+#define CONFIG_FEED_MODE_COUNT 8         /* число режимов FSM (1..8) */
+#define CONFIG_FEED_MODE_ASYNC  0        /* индекс: асинхронная подача */
+#define CONFIG_FEED_MODE_SYNC   1        /* индекс: синхронная подача */
+#define CONFIG_FEED_MODE_THREAD 2        /* индекс: резьба (без пота) */
 
 /* --- Диапазоны потенциометра (заводские, EEPROM) --- */
-#define CONFIG_FEED_ASYNC_MIN_DEFAULT   20    /* мм/мин */
-#define CONFIG_FEED_ASYNC_MAX_DEFAULT   3000   /* мм/мин */
-#define CONFIG_FEED_SYNC_MIN_DEFAULT    1     /* x100: 0.01 мм/об (7e2 MIN_FEED) */
-#define CONFIG_FEED_SYNC_MAX_DEFAULT    60    /* x100: 0.60 мм/об (7e2 MAX_FEED) */
-#define CONFIG_FEED_SYNC_RAW_SCALE      0.01f /* мм/об на единицу raw */
-#define CONFIG_FEED_ASYNC_QUANT_STEP    10    /* шаг квантования мм/мин */
-#define CONFIG_FEED_ASYNC_QUANT_SPAN    50    /* мин. размах для квантования */
+#define CONFIG_FEED_ASYNC_MIN_DEFAULT   20     /* заводской мин. async, мм/мин */
+#define CONFIG_FEED_ASYNC_MAX_DEFAULT   3000   /* заводской макс. async, мм/мин */
+#define CONFIG_FEED_SYNC_MIN_DEFAULT    1      /* заводской мин. sync ×100: 0.01 мм/об */
+#define CONFIG_FEED_SYNC_MAX_DEFAULT    60     /* заводской макс. sync ×100: 0.60 мм/об */
+#define CONFIG_FEED_SYNC_RAW_SCALE      0.01f  /* мм/об на единицу raw (×100 → физ.) */
+#define CONFIG_FEED_ASYNC_QUANT_STEP    10     /* шаг квантования async, мм/мин */
+#define CONFIG_FEED_ASYNC_QUANT_SPAN    50     /* мин. размах диапазона для квантования */
 
 /* --- Допустимые диапазоны в меню настройки пота --- */
-#define CONFIG_FEED_ASYNC_EDIT_MIN_LOW  10
-#define CONFIG_FEED_ASYNC_EDIT_MIN_HIGH 990
-#define CONFIG_FEED_ASYNC_EDIT_MAX_LOW  20
-#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 3000
-#define CONFIG_FEED_SYNC_EDIT_MIN_LOW   1
-#define CONFIG_FEED_SYNC_EDIT_MIN_HIGH  199
-#define CONFIG_FEED_SYNC_EDIT_MAX_LOW   2
-#define CONFIG_FEED_SYNC_EDIT_MAX_HIGH  600
+#define CONFIG_FEED_ASYNC_EDIT_MIN_LOW  10     /* меню: нижний предел min async */
+#define CONFIG_FEED_ASYNC_EDIT_MIN_HIGH 990    /* меню: верхний предел min async */
+#define CONFIG_FEED_ASYNC_EDIT_MAX_LOW  20     /* меню: нижний предел max async */
+#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 3000   /* меню: верхний предел max async */
+#define CONFIG_FEED_SYNC_EDIT_MIN_LOW   1      /* меню: нижний предел min sync (raw) */
+#define CONFIG_FEED_SYNC_EDIT_MIN_HIGH  199    /* меню: верхний предел min sync (raw) */
+#define CONFIG_FEED_SYNC_EDIT_MAX_LOW   2      /* меню: нижний предел max sync (raw) */
+#define CONFIG_FEED_SYNC_EDIT_MAX_HIGH  600    /* меню: верхний предел max sync (raw) */
 
 typedef enum {
     FEED_RANGE_ASYNC = 0,  /* мм/мин */

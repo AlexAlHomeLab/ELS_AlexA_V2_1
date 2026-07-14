@@ -5,11 +5,14 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-#define EEPROM_BACKLASH_MAGIC   0xB2
-#define EEPROM_BACKLASH_ADDR    56
-#define EEPROM_BACKLASH_ADDR_SUM 64
+#define EEPROM_BACKLASH_MAGIC   0xB3     /* текущая сигнатура (+ поле enabled) */
+#define EEPROM_BACKLASH_MAGIC_V1 0xB2    /* старый формат без enabled — миграция */
+#define EEPROM_BACKLASH_ADDR    56       /* адрес начала блока backlash */
+#define EEPROM_BACKLASH_ADDR_SUM 65      /* checksum: magic@56 + 8 байт cfg → sum@65 */
+
 
 typedef struct __attribute__((packed)) {
+    uint8_t enabled;      /* 1 — компенсация вкл (меню BlEn) */
     uint8_t auto_on;      /* автовыборка при старте */
     uint16_t steps_x;     /* шаги выборки X; 0 → CENTIMM */
     uint16_t steps_z;
@@ -17,9 +20,19 @@ typedef struct __attribute__((packed)) {
     uint8_t min_speed;    /* мм/мин */
 } BacklashCfg_t;
 
+/* Старый layout без enabled (magic 0xB2, sum@64) — для миграции */
+typedef struct __attribute__((packed)) {
+    uint8_t auto_on;
+    uint16_t steps_x;
+    uint16_t steps_z;
+    uint8_t auto_speed;
+    uint8_t min_speed;
+} BacklashCfgV1_t;
+
 static BacklashCfg_t bl_cfg;
 
 static const BacklashCfg_t bl_defaults = {
+    BACKLASH_ENABLE_DEFAULT,
     BACKLASH_AUTO_DEFAULT,
     BACKLASH_X_STEPS_DEFAULT,
     BACKLASH_Z_STEPS_DEFAULT,
@@ -54,7 +67,33 @@ static uint8_t bl_cfg_checksum(const BacklashCfg_t *c) {
     return sum;
 }
 
+static uint8_t bl_cfg_v1_checksum(const BacklashCfgV1_t *c) {
+    uint8_t sum = EEPROM_BACKLASH_MAGIC_V1;
+    const uint8_t *p = (const uint8_t *)c;
+    for (uint8_t i = 0; i < sizeof(BacklashCfgV1_t); i++) {
+        sum = (uint8_t)(sum + p[i]);
+    }
+    return sum;
+}
+
 static uint8_t bl_cfg_validate(const BacklashCfg_t *c) {
+    if (c->enabled > 1) return 0;
+    if (c->auto_on > 1) return 0;
+    if (c->steps_x > BACKLASH_STEPS_MAX) return 0;
+    if (c->steps_z > BACKLASH_STEPS_MAX) return 0;
+    if (c->auto_speed < BACKLASH_AUTO_SPEED_MIN ||
+        c->auto_speed > BACKLASH_AUTO_SPEED_MAX) {
+        return 0;
+    }
+    if (c->min_speed < BACKLASH_MIN_SPEED_MIN ||
+        c->min_speed > BACKLASH_MIN_SPEED_MAX) {
+        return 0;
+    }
+    if (c->min_speed > c->auto_speed) return 0;
+    return 1;
+}
+
+static uint8_t bl_cfg_v1_validate(const BacklashCfgV1_t *c) {
     if (c->auto_on > 1) return 0;
     if (c->steps_x > BACKLASH_STEPS_MAX) return 0;
     if (c->steps_z > BACKLASH_STEPS_MAX) return 0;
@@ -86,10 +125,10 @@ static void bl_cfg_write_eeprom(void) {
 
 void config_backlash_load(void) {
     uint8_t magic = EEPROM.read(EEPROM_BACKLASH_ADDR);
-    uint8_t sum_stored = EEPROM.read(EEPROM_BACKLASH_ADDR_SUM);
-    BacklashCfg_t loaded;
 
     if (magic == EEPROM_BACKLASH_MAGIC) {
+        BacklashCfg_t loaded;
+        uint8_t sum_stored = EEPROM.read(EEPROM_BACKLASH_ADDR_SUM);
         uint8_t *p = (uint8_t *)&loaded;
         for (uint8_t i = 0; i < sizeof(BacklashCfg_t); i++) {
             p[i] = EEPROM.read((int)(EEPROM_BACKLASH_ADDR + 1 + i));
@@ -97,6 +136,25 @@ void config_backlash_load(void) {
         if (sum_stored == bl_cfg_checksum(&loaded) && bl_cfg_validate(&loaded)) {
             bl_cfg = loaded;
             DBG_INFO("CFG", "BL", "loaded");
+            return;
+        }
+    } else if (magic == EEPROM_BACKLASH_MAGIC_V1) {
+        /* Миграция: старый блок без enabled → enabled=1, сохранить Bl* */
+        BacklashCfgV1_t old;
+        uint8_t sum_stored = EEPROM.read(64);  /* старый ADDR_SUM */
+        uint8_t *p = (uint8_t *)&old;
+        for (uint8_t i = 0; i < sizeof(BacklashCfgV1_t); i++) {
+            p[i] = EEPROM.read((int)(EEPROM_BACKLASH_ADDR + 1 + i));
+        }
+        if (sum_stored == bl_cfg_v1_checksum(&old) && bl_cfg_v1_validate(&old)) {
+            bl_cfg.enabled = BACKLASH_ENABLE_DEFAULT;
+            bl_cfg.auto_on = old.auto_on;
+            bl_cfg.steps_x = old.steps_x;
+            bl_cfg.steps_z = old.steps_z;
+            bl_cfg.auto_speed = old.auto_speed;
+            bl_cfg.min_speed = old.min_speed;
+            bl_cfg_write_eeprom();
+            DBG_INFO("CFG", "BL", "migrated");
             return;
         }
     }
@@ -121,6 +179,10 @@ void config_backlash_factory_reset(void) {
     DBG_INFO("CFG", "BL", "factory");
 }
 
+uint8_t config_backlash_get_enabled(void) {
+    return bl_cfg.enabled;
+}
+
 uint8_t config_backlash_get_auto_on(void) {
     return bl_cfg.auto_on;
 }
@@ -139,6 +201,10 @@ uint16_t config_backlash_get_auto_speed(void) {
 
 uint16_t config_backlash_get_min_speed(void) {
     return bl_cfg.min_speed;
+}
+
+void config_backlash_set_enabled(uint8_t on) {
+    bl_cfg.enabled = on ? 1U : 0U;
 }
 
 void config_backlash_set_auto_on(uint8_t on) {

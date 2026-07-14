@@ -1,8 +1,8 @@
 #ifndef CONFIG_BACKLASH_H
 #define CONFIG_BACKLASH_H
 
-/* Настройки компенсации люфта (EEPROM $56..$64, меню BlAu/BlX/BlZ).
- * auto_on — автовыборка при старте; speeds — ограничение скорости выборки. */
+/* Настройки компенсации люфта (EEPROM $56..$65, меню BlEn/BlAu/BlX/BlZ).
+ * enabled — вкл компенсации; auto_on — автовыборка при старте. */
 
 #include "config_defs.h"
 
@@ -14,12 +14,14 @@ void config_backlash_load(void);
 void config_backlash_save(void);
 void config_backlash_factory_reset(void);
 
+uint8_t config_backlash_get_enabled(void);     /* 1 — компенсация вкл (меню BlEn) */
 uint8_t config_backlash_get_auto_on(void);      /* 1 — очередь при старте */
 uint16_t config_backlash_get_steps_x(void);     /* 0 — из CENTIMM */
 uint16_t config_backlash_get_steps_z(void);
 uint16_t config_backlash_get_auto_speed(void);  /* мм/мин, макс. выборки */
 uint16_t config_backlash_get_min_speed(void);   /* мм/мин, мин. выборки */
 
+void config_backlash_set_enabled(uint8_t on);
 void config_backlash_set_auto_on(uint8_t on);
 void config_backlash_set_steps_x(uint16_t steps);
 void config_backlash_set_steps_z(uint16_t steps);

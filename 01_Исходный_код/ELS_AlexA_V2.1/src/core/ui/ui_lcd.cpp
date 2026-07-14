@@ -12,8 +12,16 @@ static LiquidCrystalSafeAsync lcd(LCD_RS_PIN, LCD_EN_PIN,
     LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
 #elif defined(USE_LCD_STANDARD)
 #include <LiquidCrystal.h>
+#if defined(LCD_BUS_8BIT)
+/* 10 пинов: RS, EN, D0..D7 — без RW (RW на плате к GND). */
+LiquidCrystal lcd(
+    LCD_RS_PIN, LCD_RW_PIN, LCD_EN_PIN,
+    LCD_D0_PIN, LCD_D1_PIN, LCD_D2_PIN, LCD_D3_PIN,
+    LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
+#else
 static LiquidCrystal lcd(LCD_RS_PIN, LCD_EN_PIN,
     LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
+#endif
 #endif
 
 static char lcd_buffer[LCD_ROWS][LCD_COLS + 1];

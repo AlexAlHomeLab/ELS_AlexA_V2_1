@@ -93,6 +93,7 @@ static int setting_get(uint8_t id, char *buf, size_t len) {
     case 42: snprintf(buf, len, "%u", config_backlash_get_steps_z()); return 1;
     case 43: snprintf(buf, len, "%u", config_backlash_get_auto_speed()); return 1;
     case 45: snprintf(buf, len, "%u", config_backlash_get_min_speed()); return 1;
+    case 46: snprintf(buf, len, "%u", config_backlash_get_enabled()); return 1;
     case 44: snprintf(buf, len, "%u", config_get_coord_units()); return 1;
     default: return 0;
     }
@@ -253,6 +254,13 @@ static int setting_set(uint8_t id, const char *val) {
         config_backlash_set_min_speed(u16);
         config_backlash_save();
         return 1;
+    case 46:
+        config_backlash_set_enabled((val[0] == '1') ? 1U : 0U);
+        config_backlash_save();
+        if (val[0] != '1') {
+            backlash_abort_pending();
+        }
+        return 1;
     case 44:
         if (!parse_u16(val, &u16)) return 0;
         if (u16 > COORD_UNIT_INCH) return 0;
@@ -310,6 +318,7 @@ static void cmd_help(void) {
     Serial.println(F("$40 backlash auto, $41-$42 X/Z steps"));
     Serial.println(F("$43 backlash max speed mm/min"));
     Serial.println(F("$45 backlash min speed mm/min"));
+    Serial.println(F("$46 backlash enable (BlEn)"));
     Serial.println(F("$44 coord units 0=steps 1=mm 2=inch"));
     Serial.println(F("$$ all, $n query, $n=val set, $I info, ? status"));
 }

@@ -34,7 +34,7 @@ static ButtonT<HAND_AXIS_Z_PIN> sw_axis_z;
 static ButtonT<HAND_AXIS_X_PIN> sw_axis_x;
 
 static const char *mode_names[] = {
-    "Async", "Sync", "Thread", "Chamfer", "Cone", "Sphere", "Divider", "Grind"
+    "AFeed", "SFeed", "Thread", "Chamfer", "Cone", "Sphere", "Divider", "Grind"
 };
 
 static void set_sw_level(VirtButton &btn) {

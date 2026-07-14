@@ -8,10 +8,11 @@
 #include <EEPROM.h>
 
 /* Глобальный блок EEPROM: magic, feed_max%, buzzer, checksum */
-#define EEPROM_ADDR_MAGIC 0
-#define EEPROM_ADDR_FEED 1
-#define EEPROM_ADDR_BUZZER 2
-#define EEPROM_ADDR_CHECKSUM 3
+#define EEPROM_ADDR_MAGIC 0              /* байт сигнатуры CONFIG_EEPROM_MAGIC */
+#define EEPROM_ADDR_FEED 1               /* % ограничения подачи (legacy) */
+#define EEPROM_ADDR_BUZZER 2             /* 0/1 — зуммер */
+#define EEPROM_ADDR_CHECKSUM 3           /* контрольная сумма блока 0..2 */
+
 
 static uint8_t cfg_feed_max = CONFIG_FEED_MAX_DEFAULT;
 static uint8_t cfg_buzzer_on = CONFIG_BUZZER_DEFAULT;

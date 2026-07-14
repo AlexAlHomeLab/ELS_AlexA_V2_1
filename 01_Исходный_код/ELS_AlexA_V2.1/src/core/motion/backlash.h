@@ -2,7 +2,7 @@
 #define BACKLASH_H
 
 /* Компенсация люфта: выборка при смене направления (rem_x/rem_z).
- * ENABLE_BACKLASH=0 в config_defs.h отключает модуль. */
+ * ENABLE_BACKLASH=0 — модуль вырезан; BlEn (EEPROM) — рантайм вкл/выкл. */
 
 #include "../../els_types.h"
 
@@ -28,7 +28,7 @@ float backlash_get_arm_feed_mm_min(uint8_t axis);      /* подача при п
 /* 1 если шаг «съеден» люфтом (позиция не меняется) */
 uint8_t backlash_consume_step(uint8_t axis, uint8_t dir);
 
-uint8_t backlash_enabled(void);
+uint8_t backlash_enabled(void);  /* ENABLE_BACKLASH && BlEn */
 void backlash_set_steps(uint8_t axis, int32_t steps);
 int32_t backlash_get_steps(uint8_t axis);
 

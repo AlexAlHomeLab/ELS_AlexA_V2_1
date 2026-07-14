@@ -4,10 +4,11 @@
 #include <EEPROM.h>
 
 /* EEPROM feed block: magic@16, ranges@17, sum@25 */
-#define EEPROM_FEED_MAGIC 0xB7
-#define EEPROM_FEED_ADDR_MAGIC 16
-#define EEPROM_FEED_ADDR_RANGES 17
-#define EEPROM_FEED_ADDR_SUM 25
+#define EEPROM_FEED_MAGIC 0xB7           /* сигнатура блока диапазонов подачи */
+#define EEPROM_FEED_ADDR_MAGIC 16        /* адрес magic */
+#define EEPROM_FEED_ADDR_RANGES 17       /* адрес min/max raw async+sync */
+#define EEPROM_FEED_ADDR_SUM 25          /* адрес checksum блока */
+
 
 typedef struct {
     uint16_t min_raw;
