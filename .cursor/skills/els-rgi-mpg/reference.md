@@ -38,8 +38,9 @@ void    motion_jog_reset_pos(uint8_t axis);
 | Константа | Значение | Назначение |
 |-----------|----------|------------|
 | `MPG_MAX_TICKS` | 24 | Макс. тиков за один poll |
-| `MPG_LOOKAHEAD` | 4 | Множитель runway |
-| `MPG_IDLE_STOP_MS` | 80 | Пауза до финиша MPG-движения |
+| `MPG_REV_IGNORE_N` | 3 | ТЗ N; на сессии реверс только игнор |
+| `MPG_IDLE_MS` | 2000 | Конец сессии → stop на текущей pos |
+| `MPG_BATCH_MS` | 8 | Пакет детентов перед commit |
 
 ## config_mpg.h
 

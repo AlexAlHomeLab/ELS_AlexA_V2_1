@@ -111,8 +111,10 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 
 - Импульсы одного направления суммируются в `mpg_cmd[axis]`; цель удлиняется без промежуточных остановок.
 - Каждый poll с новыми тиками → `planner_exec_jog` с `cruise=1` (единое движение без торможения между тиками).
-- `mpg_runway` + `MPG_LOOKAHEAD` — lookahead, чтобы DDS не догонял цель по одному шагу.
-- Простой `MPG_IDLE_STOP_MS` (80 мс) — финальная подача к `mpg_cmd` и `planner_jog_stop`.
+- Цель planner = `mpg_cmd`, при живых тиках + pad **за cmd** (`mpg_cmd±lead`, не `pos+lead` — иначе runaway).
+- Живой cruise: retarget; **не** stop+start при неудаче retarget (`planner.cpp`).
+- Реверс: ≤N игнор, >N — `planner_jog_stop`, сброс сессии (ТЗ).
+- `MPG_IDLE_MS` (2500): stop на pos; `dir_lock` после idle можно сменить после N.
 
 ### Накопитель `hand_pos`
 
@@ -130,10 +132,9 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 
 - ISR только инкрементирует `hand_count`; обработка в `loop` через `ui_encoder_consume_mpg_tick()` (по 1 тику).
 - Пакетная обработка: до `MPG_MAX_TICKS` (24) тиков за один poll.
-- **Смена направления во время движения:**
-  - Обратные тики ≤ `MPG_REV_IGNORE_TICKS` (N, константа в `motion_jog.cpp` или `config.h`) — игнорировать.
-  - Обратные тики > N — немедленно `dds_motion_stop()` + `planner_jog_stop()`, сброс активного MPG-движения, затем обработка нового направления.
-- Если N не задано в ТЗ — предложи значение 2–4 и вынеси в `#define`.
+- ТЗ: реверс ≤N игнор, >N стоп (N=3). На практике при `mpg_active`/cruise — **только игнор** (дребезг детентов иначе рвёт «одно движение»).
+- Смена направления — после `MPG_IDLE_MS` (`mpg_active=0`).
+- `mpg_dir_lock` липкий на сессию.
 
 ### Параметры движения РГИ
 

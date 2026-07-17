@@ -266,7 +266,7 @@ uint8_t planner_startup_busy(void) {
     return 0;
 }
 
-#define PLN_MAX_JOG_STEPS 4096U
+#define PLN_MAX_JOG_STEPS 16384U  /* запас cruise: ~0.5 с при ~30 кГц (было 4096 → рывки) */
 
 static int32_t pln_clamp_jog_target(int32_t pos, int32_t tgt) {
     int32_t d = tgt - pos;
@@ -328,6 +328,12 @@ uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char 
     extended = dds_motion_jog_retarget(&cmd);
     if (extended) {
         DBG_JOG_MOVE_LIM(kind, tx, tz, speed_mm_min, 1, lim_hit, lim_cmp, lim_cmp_stp);
+        block_exec = 1;
+        return 1U;
+    }
+
+    /* Живой jog-cruise: не stop+start (рывки разгона / повторный CRUISE) */
+    if (cruise && dds_motion_jog_cruise_active()) {
         block_exec = 1;
         return 1U;
     }

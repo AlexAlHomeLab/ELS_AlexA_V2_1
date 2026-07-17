@@ -21,7 +21,7 @@
 #define LCD_UPDATE_MS 80                  /* период обновления дисплея, мс */
 #define POT_READ_MS 100                  /* период опроса потенциометра подачи, мс */
 
-#define DEBUG_ENABLED 0                  /* 1 — включить DBG_* вывод в Serial */
+#define DEBUG_ENABLED 1                  /* 1 — включить DBG_* вывод в Serial */
 
 #define DEBUG_LEVEL_ERROR   0            /* только ошибки */
 #define DEBUG_LEVEL_WARNING 1            /* + предупреждения */
@@ -29,7 +29,7 @@
 #define DEBUG_LEVEL_VERBOSE 3            /* максимум детализации */
 
 #ifndef DEBUG_LEVEL
-#define DEBUG_LEVEL DEBUG_LEVEL_INFO     /* активный уровень, если не задан снаружи */
+#define DEBUG_LEVEL DEBUG_LEVEL_INFO        /* VERBOSE рвёт плавность РГИ (Serial) */
 #endif
 
 /* Трассировка краша: TRACE_ENTER(id) в цепочке MPG/jog (debug_trace.h) */
@@ -43,7 +43,7 @@
 
 #define BTN_DEBOUNCE_MS 50               /* антидребезг кнопок, мс */
 
-#define STEP_ISR_PERIOD_US 33            /* период ISR шагов, мкс (~30 кГц) */
+#define STEP_ISR_PERIOD_US 40            /* период ISR шагов, мкс (~25 кГц; 33 не хватало на cruise) */
 #define STEP_ISR_FREQ_HZ (1000000UL / STEP_ISR_PERIOD_US) /* частота ISR, Гц */
 
 #include "config_defs.h"
