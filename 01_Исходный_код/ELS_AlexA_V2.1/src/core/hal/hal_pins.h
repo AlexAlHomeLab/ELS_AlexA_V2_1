@@ -10,9 +10,9 @@
 /* --- Шаговые двигатели (этап 2) --- */
 #define STEP_X_PIN 48          /* импульс STEP оси X (драйвер) */
 #define DIR_X_PIN 44           /* направление DIR оси X */
+#define EN_X_PIN 46            /* Enable драйвера X (PL3); HIGH=вкл как STEP */
 #define STEP_Z_PIN 49          /* импульс STEP оси Z (драйвер) */
 #define DIR_Z_PIN 43           /* направление DIR оси Z */
-#define EN_X_PIN 46            /* Enable драйвера X (PL3); HIGH=вкл как STEP */
 #define EN_Z_PIN 45            /* Enable драйвера Z (PL4); только объявление */
 
 /* --- LCD 2004 (LiquidCrystal) --- */
@@ -25,7 +25,7 @@
 #define LCD_D1_PIN 39          /* шина данных LCD, бит D1 (только 8-бит режим) */
 #define LCD_D0_PIN 38          /* шина данных LCD, бит D0 (только 8-бит режим) */
 #define LCD_EN_PIN 9           /* Enable LCD (строб записи/чтения) */
-#define LCD_RW_PIN 23          /* R/W LCD: 0=запись, 1=чтение */
+#define LCD_RW_PIN 47          /* R/W LCD: 0=запись, 1=чтение */
 #define LCD_RS_PIN 8           /* Register Select: 0=команда, 1=данные */
 
 /* --- Бипер (PH1 D16, активный LOW — покой HIGH, см. hal_buzzer) --- */
@@ -129,7 +129,7 @@
 #define LIMIT_UP_PIN    LIMIT_FRONT_PIN          /* алиас: лимит «вверх» по X = Front */
 #define LIMIT_DOWN_PIN  LIMIT_REAR_PIN           /* алиас: лимит «вниз» по X = Rear */
 
-#define ESTOP_BTN_PIN     47 /* авария E-stop (активный LOW); было 40 — занят LCD_D2 в 8-бит */
+#define ESTOP_BTN_PIN     5 /* авария E-stop (активный LOW); было 40 — занят LCD_D2 в 8-бит */
 #define SPINDLE_PWM_PIN   6  /* ШИМ оборотов шпинделя (OC4A / Timer4) */
 #define COOLANT_PIN       17 /* реле/выход СОЖ (охлаждение) */
 

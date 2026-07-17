@@ -1,6 +1,10 @@
 #ifndef CONFIG_LCD_H
 #define CONFIG_LCD_H
 
+/* Раскомментировать — полностью отключить передачу на HD44780 (пин I/O нет).
+ * Буфер lcd_buffer / set_line* остаются; удобно для отладки timing/EMI. */
+//#define LCD_DISABLE_TX
+
 /* Выбор драйвера HD44780: раскомментировать ОДИН вариант.
  * По умолчанию — стандартная LiquidCrystal (минимум RAM). */
 

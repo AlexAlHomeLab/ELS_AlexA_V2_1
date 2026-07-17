@@ -39,7 +39,7 @@ uint8_t ui_switches_mode_off(void); /* 1 = сырой скан 0 */
 
 ```
 ui_switches_poll
-  scanned = scan_mode_pin()
+  scanned = scan_mode_pin()   # digitalRead D30..D37, не EncButton
   mode_off = mode_off_debounced(scanned)  # OFF только после MODE_OFF_DEBOUNCE_MS
   scan>0 → mode_off=0 сразу; latch mode
   scan==0 устойчиво → mode_off=1, motion_jog_resume, motor_en_x_release
@@ -47,6 +47,7 @@ fsm_manager: использует sw.mode (latch), не mode_off
 motion_jog_*: if mode_off → return
 update_lcd: if mode_off → CNC OFF screen
 ```
+Boot: mode_off=0, mode_off_raw_ms=0 (таймер только в poll).
 
 Константа: `MODE_OFF_DEBOUNCE_MS` в `config_defs.h` (default 150).
 

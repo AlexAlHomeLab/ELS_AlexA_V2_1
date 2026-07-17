@@ -48,16 +48,18 @@ static void ui_buzzer_mode_beep(void) {
     hal_buzzer_beep_ms(40);
 }
 
+/* Галетник держит контакт постоянно — digitalRead, не EncButton.pressing()
+ * (debounce EncButton даёт ложный scan==0 на boot и до ~50 мс в poll). */
 static uint8_t scan_mode_pin(void) {
     uint8_t raw = 0;
-    if (sw_mode_1.pressing()) raw = 1;
-    else if (sw_mode_2.pressing()) raw = 2;
-    else if (sw_mode_3.pressing()) raw = 3;
-    else if (sw_mode_4.pressing()) raw = 4;
-    else if (sw_mode_5.pressing()) raw = 5;
-    else if (sw_mode_6.pressing()) raw = 6;
-    else if (sw_mode_7.pressing()) raw = 7;
-    else if (sw_mode_8.pressing()) raw = 8;
+    if (digitalRead(MODE_PIN_1) == LOW) raw = 1;
+    else if (digitalRead(MODE_PIN_2) == LOW) raw = 2;
+    else if (digitalRead(MODE_PIN_3) == LOW) raw = 3;
+    else if (digitalRead(MODE_PIN_4) == LOW) raw = 4;
+    else if (digitalRead(MODE_PIN_5) == LOW) raw = 5;
+    else if (digitalRead(MODE_PIN_6) == LOW) raw = 6;
+    else if (digitalRead(MODE_PIN_7) == LOW) raw = 7;
+    else if (digitalRead(MODE_PIN_8) == LOW) raw = 8;
     if (raw == 0) {
         return 0;
     }
@@ -164,14 +166,11 @@ void ui_switches_init(void) {
     read_mpg_axis();
     read_mpg_scale();
 
-    /* Boot: OFF уже стоит — без ожиданий; иначе debounce в poll */
+    /* Boot: mode_off=0, таймер debounce не стартуем.
+     * Иначе ложный scan==0 (EncButton) + длинный setup ≥ MODE_OFF_DEBOUNCE_MS
+     * дают OFF уже на первом poll. Таймер — только в mode_off_debounced(). */
+    sw_state.mode_off = 0U;
     mode_off_raw_ms = 0UL;
-    if (scanned == 0U) {
-        sw_state.mode_off = 1U;
-        mode_off_raw_ms = (millis() != 0UL) ? millis() : 1UL;
-    } else {
-        sw_state.mode_off = 0U;
-    }
     sw_state.mode = read_mode();
     sw_state.submode = read_submode();
     sw_state.mpg_axis = latched_mpg_axis;
@@ -181,10 +180,6 @@ void ui_switches_init(void) {
     last_submode = sw_state.submode;
     last_mpg_axis = sw_state.mpg_axis;
     last_mpg_scale = sw_state.mpg_scale;
-    if (sw_state.mode_off) {
-        motion_jog_resume();  /* стоп осей до снятия EN */
-        motor_en_x_release();
-    }
 }
 
 void ui_switches_poll(void) {

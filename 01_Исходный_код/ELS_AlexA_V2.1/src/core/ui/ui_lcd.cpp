@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <string.h>
 
+#if !defined(LCD_DISABLE_TX)
 #if defined(USE_LCD_SAFE_ASYNC)
 #include <LiquidCrystalSafeAsync.h>
 /* 6 пинов — без RW; maxRetries задаётся в ui_lcd_init (7-й аргумент неоднозначен с RW-конструктором). */
@@ -23,16 +24,17 @@ static LiquidCrystal lcd(LCD_RS_PIN, LCD_EN_PIN,
     LCD_D4_PIN, LCD_D5_PIN, LCD_D6_PIN, LCD_D7_PIN);
 #endif
 #endif
+#endif /* !LCD_DISABLE_TX */
 
 static char lcd_buffer[LCD_ROWS][LCD_COLS + 1];
 static uint8_t lcd_cursor_line = 0xFF;
 static uint8_t lcd_cursor_col = 0;
 
-#if defined(USE_LCD_SAFE_ASYNC) && (LCD_SYNC_INTERVAL_MS > 0)
+#if !defined(LCD_DISABLE_TX) && defined(USE_LCD_SAFE_ASYNC) && (LCD_SYNC_INTERVAL_MS > 0)
 static unsigned long lcd_last_sync_ms = 0;
 #endif
 
-#if defined(USE_LCD_SAFE_ASYNC)
+#if !defined(LCD_DISABLE_TX) && defined(USE_LCD_SAFE_ASYNC)
 static void lcd_drain_queue(unsigned long us_budget) {
     unsigned long t0 = micros();
     for (;;) {
@@ -45,19 +47,20 @@ static void lcd_drain_queue(unsigned long us_budget) {
 
 /* SafeAsync: drain очереди на HD44780 по бюджету за проход loop (не из ISR). */
 void ui_lcd_process_queue(void) {
-#if defined(USE_LCD_SAFE_ASYNC)
+#if !defined(LCD_DISABLE_TX) && defined(USE_LCD_SAFE_ASYNC)
     lcd_drain_queue(LCD_PROCESS_US_BUDGET);
 #endif
 }
 
 /* SafeAsync: полный drain — только setup/init (до входа в loop). */
 void ui_lcd_flush(void) {
-#if defined(USE_LCD_SAFE_ASYNC)
+#if !defined(LCD_DISABLE_TX) && defined(USE_LCD_SAFE_ASYNC)
     lcd.flush();
 #endif
 }
 
 void ui_lcd_init(void) {
+#if !defined(LCD_DISABLE_TX)
 #if defined(USE_LCD_SAFE_ASYNC)
     lcd.setMaxRetries(LCD_SAFE_MAX_RETRIES);
 #endif
@@ -67,6 +70,7 @@ void ui_lcd_init(void) {
     lcd_drain_queue(LCD_FLUSH_US_BUDGET);
 #endif
     lcd.noCursor();
+#endif
     lcd_cursor_line = 0xFF;
     for (uint8_t i = 0; i < LCD_ROWS; i++) {
         ui_lcd_clear_line(i);
@@ -75,6 +79,9 @@ void ui_lcd_init(void) {
 
 /* STANDARD: синхронный вывод. SafeAsync: только enqueue — drain в ui_lcd_process_queue(). */
 void ui_lcd_update(void) {
+#if defined(LCD_DISABLE_TX)
+    return;
+#else
     if (lcd_cursor_line >= LCD_ROWS) {
         lcd.noCursor();
     }
@@ -97,6 +104,7 @@ void ui_lcd_update(void) {
         lcd_last_sync_ms = now;
     }
 #endif
+#endif /* LCD_DISABLE_TX */
 }
 
 void ui_lcd_set_line(uint8_t line, const char *text) {
@@ -125,11 +133,13 @@ void ui_lcd_clear_line(uint8_t line) {
 }
 
 void ui_lcd_clear(void) {
+#if !defined(LCD_DISABLE_TX)
     lcd.clear();
 #if defined(USE_LCD_SAFE_ASYNC)
     lcd_drain_queue(LCD_FLUSH_US_BUDGET);
 #endif
     lcd.noCursor();
+#endif
     lcd_cursor_line = 0xFF;
     for (uint8_t i = 0; i < LCD_ROWS; i++) {
         ui_lcd_clear_line(i);

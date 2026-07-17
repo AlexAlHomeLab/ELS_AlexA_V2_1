@@ -18,6 +18,8 @@ description: >-
 Вход в MODE_OFF — только после удержания `scan==0` в течение `MODE_OFF_DEBOUNCE_MS`
 (по умолчанию 150 мс), чтобы краткий разрыв контакта при повороте 1↔8 не давал OFF.
 Выход из MODE_OFF — сразу при появлении любого валидного пина режима.
+Скан 1–8 / OFF: `digitalRead` MODE_PIN (галетник), не EncButton `pressing()`.
+Boot: `mode_off=0`, таймер debounce не стартуем (старт только в poll).
 В MODE_OFF блокируются джойстик и РГИ полностью.
 На дисплее в MODE_OFF: строка 1 — `CNC OFF` по центру; строка 2 пустая;
 строка 3 — обороты шпинделя по шаблону `RPM 1000` по центру;
@@ -67,7 +69,7 @@ UI MODE_OFF определяется по сырому скану.
 | Joy / РГИ / go_lim | не работают при `mode_off` |
 | LCD | экран CNC OFF (см. ниже) |
 | FSM `sw.mode` | последний валидный 1–8 (latch), не менять на 0 |
-| Boot при `scan==0` | MODE_OFF сразу (без ожидания debounce) |
+| Boot | `mode_off=0`, `mode_off_raw_ms=0`; debounce только в poll (не на init) |
 
 ## Экран MODE_OFF (LCD 2004)
 
