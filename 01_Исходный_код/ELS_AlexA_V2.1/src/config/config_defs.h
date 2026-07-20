@@ -78,7 +78,7 @@
 #define BACKLASH_AUTO_SPEED_MAX       200 /* макс. допустимый BlSp, мм/мин */
 #define BACKLASH_MIN_SPEED_DEFAULT    20 /* мин. скорость выборки BlMn, мм/мин */
 #define BACKLASH_MIN_SPEED_MIN        5  /* нижний предел BlMn в меню, мм/мин */
-#define BACKLASH_MIN_SPEED_MAX        1000 /* верхний предел BlMn в меню, мм/мин */
+#define BACKLASH_MIN_SPEED_MAX        200 /* верхний предел BlMn в меню, мм/мин */
 
 /* --- Единицы отображения координат (EEPROM $44 / меню CrdU) --- */
 #define COORD_UNIT_STEPS              0  /* отображение в шагах */

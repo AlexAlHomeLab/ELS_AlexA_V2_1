@@ -46,8 +46,8 @@ void    motion_jog_reset_pos(uint8_t axis);
 
 | Константа | Значение | Назначение |
 |-----------|----------|------------|
-| `MPG_RAPID_MODE_LIVE` | 0 | Rapid+РГИ: 0.1 мм, движение сразу |
-| `MPG_RAPID_MODE_APPROACH` | 1 | Точный подвод: цель при Rapid, ход при отпускании |
+| `MPG_RAPID_MODE_LIVE` | 0 | Rapid+РГИ: 0.1 мм/тик, движение сразу |
+| `MPG_RAPID_MODE_APPROACH` | 1 | Точный подвод: шаг с селектора; цель при Rapid, ход при отпускании |
 | `MPG_RAPID_MODE` | APPROACH | Активный режим (compile-time) |
 
 ### Скорости РГИ (мм/мин, compile-time)
@@ -101,8 +101,8 @@ if (st == STATE_MANUAL) {
 
 - `mpg_axis`: AXIS_Z / AXIS_X (латч при LOW на соответствующем пине)
 - `mpg_scale`: 0 = 1 шаг двигателя, 1 = 0.01 мм
-- Rapid: `btn.joy_rapid` из `ui_buttons` → 0.1 мм/тик
-- Xdia=диаметр + X: 0.01 → `spm/200`, Rapid → `spm/20` (см. SKILL.md)
+- Rapid LIVE: `mpg_step_use_rapid()` → 0.1 мм/тик; APPROACH: шаг с `mpg_scale` (селектор)
+- Xdia=диаметр + X: 0.01 → `spm/200`, Rapid LIVE → `spm/20` (см. SKILL.md)
 
 ## Планировщик — cruise
 

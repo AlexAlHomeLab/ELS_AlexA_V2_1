@@ -103,19 +103,35 @@ uint8_t limits_ui_go_target(uint8_t idx, uint8_t *axis, int32_t *target) {
 uint8_t limits_ui_go_target_dir(uint8_t axis, int8_t sign, uint8_t *idx, int32_t *target) {
     if (axis > AXIS_Z || sign == 0 || idx == NULL || target == NULL) return 0;
 
-    uint8_t lim_idx = (sign > 0)
-        ? ((axis == AXIS_Z) ? 2 : 1)
-        : ((axis == AXIS_Z) ? 0 : 3);
-
-    if (!limit_active[lim_idx]) return 0;
-
+    /* Пара оси: Z LimL/LimR, X LimRe/LimF — ближайший впереди по sign */
+    uint8_t a = (axis == AXIS_Z) ? 0 : 3;
+    uint8_t b = (axis == AXIS_Z) ? 2 : 1;
     int32_t cur = read_axis_pos(axis);
-    int32_t tgt = limit_pos[lim_idx];
-    if (sign > 0 && cur >= tgt) return 0;
-    if (sign < 0 && cur <= tgt) return 0;
+    uint8_t best = 0xFF;
+    int32_t best_pos = 0;
 
-    *idx = lim_idx;
-    *target = tgt;
+    for (uint8_t n = 0; n < 2; n++) {
+        uint8_t i = (n == 0) ? a : b;
+        if (!limit_active[i]) continue;
+        int32_t p = limit_pos[i];
+        if (sign > 0) {
+            if (p <= cur) continue;
+            if (best == 0xFF || p < best_pos) {
+                best = i;
+                best_pos = p;
+            }
+        } else {
+            if (p >= cur) continue;
+            if (best == 0xFF || p > best_pos) {
+                best = i;
+                best_pos = p;
+            }
+        }
+    }
+    if (best == 0xFF) return 0;
+
+    *idx = best;
+    *target = best_pos;
     return 1;
 }
 

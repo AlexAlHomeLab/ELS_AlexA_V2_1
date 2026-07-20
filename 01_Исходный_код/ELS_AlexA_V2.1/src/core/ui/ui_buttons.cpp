@@ -114,17 +114,17 @@ static uint8_t joy_feed_dir(uint8_t *axis, int8_t *sign) {
 static void log_limit_event(const char *name, VirtButton &btn, uint8_t idx) {
     if (btn.hold()) {
         DBG_INFO("UI", "HOLD", name);
-        if (idx == 0) {
-            uint8_t axis;
-            int8_t sign;
-            uint8_t lim_idx;
-            int32_t target;
-            if (joy_feed_dir(&axis, &sign) &&
-                limits_ui_go_target_dir(axis, sign, &lim_idx, &target)) {
+        /* Joy вкл: latch к лимиту по направлению; zero только без joy */
+        uint8_t axis;
+        int8_t sign;
+        uint8_t lim_idx;
+        int32_t target;
+        if (joy_feed_dir(&axis, &sign)) {
+            if (limits_ui_go_target_dir(axis, sign, &lim_idx, &target)) {
                 DBG_INFO("UI", "LATCH", name);
                 motion_jog_go_limit_latch(lim_idx);
-                return;
             }
+            return;
         }
         limits_ui_on_hold(idx);
         return;

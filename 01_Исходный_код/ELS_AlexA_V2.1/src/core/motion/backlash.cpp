@@ -74,8 +74,6 @@ static uint32_t bl_inc_x = 0U;      /* DDS increment выборки X */
 static uint32_t bl_inc_z = 0U;      /* DDS increment выборки Z */
 static uint32_t bl_min_sps_x = 1U;  /* BlMn → steps/s, кэш */
 static uint32_t bl_min_sps_z = 1U;
-static uint32_t bl_max_sps_x = 1U;  /* BlSp → steps/s, кэш */
-static uint32_t bl_max_sps_z = 1U;
 
 /* DDS increment без stepper_gen (ISR-safe) */
 static uint32_t bl_calc_increment(uint32_t sps)
@@ -88,28 +86,18 @@ static void bl_reload_sps_cache(void)
 {
     bl_min_sps_x = config_mm_min_to_sps(AXIS_X, (float)config_backlash_get_min_speed());
     bl_min_sps_z = config_mm_min_to_sps(AXIS_Z, (float)config_backlash_get_min_speed());
-    bl_max_sps_x = config_mm_min_to_sps(AXIS_X, (float)config_backlash_get_auto_speed());
-    bl_max_sps_z = config_mm_min_to_sps(AXIS_Z, (float)config_backlash_get_auto_speed());
 }
 
-/* feed_sps → bl_inc; clamp [BlMn, BlSp] (как до привязки к feed) */
+/* feed_sps → bl_inc; скорость = feed, не ниже BlMn. BlSp — только стартовая очередь. */
 static void bl_store_arm_speed(uint8_t axis, uint32_t feed_sps)
 {
     uint32_t min_sps;
-    uint32_t max_sps;
     uint32_t sps;
     uint32_t inc;
 
-    if (axis == AXIS_X) {
-        min_sps = bl_min_sps_x;
-        max_sps = bl_max_sps_x;
-    } else {
-        min_sps = bl_min_sps_z;
-        max_sps = bl_max_sps_z;
-    }
+    min_sps = (axis == AXIS_X) ? bl_min_sps_x : bl_min_sps_z;
     sps = feed_sps;
     if (sps < min_sps) sps = min_sps;
-    if (sps > max_sps) sps = max_sps;
     inc = bl_calc_increment(sps);
     if (inc < 1U) inc = 1U;
 

@@ -3,7 +3,7 @@
 
 /* Режим Rapid + РГИ (только MPG; джойстик Rapid не меняется). */
 #define MPG_RAPID_MODE_LIVE       0   /* 0.1 мм/тик + движение сразу (как раньше) */
-#define MPG_RAPID_MODE_APPROACH   1   /* точный подвод: цель при Rapid, ход при отпускании */
+#define MPG_RAPID_MODE_APPROACH   1   /* точный подвод: шаг с селектора; цель при Rapid, ход при отпускании */
 
 #ifndef MPG_RAPID_MODE
 #define MPG_RAPID_MODE  MPG_RAPID_MODE_APPROACH
@@ -11,6 +11,11 @@
 
 #if (MPG_RAPID_MODE != MPG_RAPID_MODE_LIVE) && (MPG_RAPID_MODE != MPG_RAPID_MODE_APPROACH)
 #error "MPG_RAPID_MODE: только MPG_RAPID_MODE_LIVE или MPG_RAPID_MODE_APPROACH"
+#endif
+
+/* Полярность РГИ по оси Z: 1 — вправо +Z, влево −Z (см. mpg_adjust_tick_sign) */
+#ifndef MPG_AXIS_Z_INVERT
+#define MPG_AXIS_Z_INVERT  1
 #endif
 
 /* Скорости РГИ, мм/мин — отдельно от джойстика/pot; в рантайме clamp к max_speed оси. */

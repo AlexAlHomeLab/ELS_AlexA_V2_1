@@ -18,7 +18,7 @@ extern "C" {
 
 /* --- Диапазоны потенциометра (заводские, EEPROM) --- */
 #define CONFIG_FEED_ASYNC_MIN_DEFAULT   20     /* заводской мин. async, мм/мин */
-#define CONFIG_FEED_ASYNC_MAX_DEFAULT   3000   /* заводской макс. async, мм/мин */
+#define CONFIG_FEED_ASYNC_MAX_DEFAULT   1200   /* заводской макс. async, мм/мин */
 #define CONFIG_FEED_SYNC_MIN_DEFAULT    1      /* заводской мин. sync ×100: 0.01 мм/об */
 #define CONFIG_FEED_SYNC_MAX_DEFAULT    60     /* заводской макс. sync ×100: 0.60 мм/об */
 #define CONFIG_FEED_SYNC_RAW_SCALE      0.01f  /* мм/об на единицу raw (×100 → физ.) */
@@ -29,7 +29,7 @@ extern "C" {
 #define CONFIG_FEED_ASYNC_EDIT_MIN_LOW  10     /* меню: нижний предел min async */
 #define CONFIG_FEED_ASYNC_EDIT_MIN_HIGH 990    /* меню: верхний предел min async */
 #define CONFIG_FEED_ASYNC_EDIT_MAX_LOW  20     /* меню: нижний предел max async */
-#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 3000   /* меню: верхний предел max async */
+#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 1200   /* меню: верхний предел max async */
 #define CONFIG_FEED_SYNC_EDIT_MIN_LOW   1      /* меню: нижний предел min sync (raw) */
 #define CONFIG_FEED_SYNC_EDIT_MIN_HIGH  199    /* меню: верхний предел min sync (raw) */
 #define CONFIG_FEED_SYNC_EDIT_MAX_LOW   2      /* меню: нижний предел max sync (raw) */
