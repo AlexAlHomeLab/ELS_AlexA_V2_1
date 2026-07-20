@@ -886,7 +886,7 @@ dds_motion_start_exit:
     SREG = sreg;
 }
 
-/* Установить DIR и arm люфта только при смене направления (не каждый retarget). */
+/* DIR на пин всегда (sync после hal_init/invert); BL/mlog — только при смене. */
 static void motion_update_dirs(int32_t dx, int32_t dz, float feed_mm_min) {
     uint8_t mpg = (motion_prof.flags & MOTION_FLAG_MPG) ? 1U : 0U;
 
@@ -895,16 +895,16 @@ static void motion_update_dirs(int32_t dx, int32_t dz, float feed_mm_min) {
         if (axis_x.direction != nd) {
             mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, axis_x.position + dx);
             backlash_arm_axis(AXIS_X, nd, 1, motion_backlash_arm_sps(AXIS_X, feed_mm_min, mpg));
-            dds_set_direction(AXIS_X, nd);
         }
+        dds_set_direction(AXIS_X, nd);  /* иначе 1-й JoyD при direction==0 и DIR=LOW */
     }
     if (dz != 0) {
         uint8_t nd = (dz > 0) ? 1U : 0U;
         if (axis_z.direction != nd) {
             mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, axis_z.position + dz);
             backlash_arm_axis(AXIS_Z, nd, 1, motion_backlash_arm_sps(AXIS_Z, feed_mm_min, mpg));
-            dds_set_direction(AXIS_Z, nd);
         }
+        dds_set_direction(AXIS_Z, nd);
     }
     motion_boost_backlash_rates();
 }
@@ -1011,22 +1011,22 @@ uint8_t dds_motion_jog_retarget(const MotionCommand_t *cmd) {
         goto dds_retarget_exit;
     }
 
-    /* DIR/BL только при смене (sps уже посчитаны вне cli) */
+    /* BL/mlog при смене; DIR на пин всегда (sps уже вне cli) */
     if (dx != 0) {
         uint8_t nd = (dx > 0) ? 1U : 0U;
         if (axis_x.direction != nd) {
             mlog_push_dir(AXIS_X, nd ? 1 : -1, axis_x.position, cmd->target_x);
             backlash_arm_axis(AXIS_X, nd, 1, feed_sps_x);
-            dds_set_direction(AXIS_X, nd);
         }
+        dds_set_direction(AXIS_X, nd);
     }
     if (dz != 0) {
         uint8_t nd = (dz > 0) ? 1U : 0U;
         if (axis_z.direction != nd) {
             mlog_push_dir(AXIS_Z, nd ? 1 : -1, axis_z.position, cmd->target_z);
             backlash_arm_axis(AXIS_Z, nd, 1, feed_sps_z);
-            dds_set_direction(AXIS_Z, nd);
         }
+        dds_set_direction(AXIS_Z, nd);
     }
 
     dds_set_target(AXIS_X, cmd->target_x);
