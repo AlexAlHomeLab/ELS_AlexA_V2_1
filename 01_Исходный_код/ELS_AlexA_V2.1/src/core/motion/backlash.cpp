@@ -289,6 +289,11 @@ uint32_t backlash_get_arm_inc(uint8_t axis)
     return inc;
 }
 
+uint32_t backlash_get_min_inc(uint8_t axis)
+{
+    return bl_calc_increment((axis == AXIS_X) ? bl_min_sps_x : bl_min_sps_z);
+}
+
 float backlash_get_arm_feed_mm_min(uint8_t axis)
 {
     float feed = (axis == AXIS_X) ? bl_feed_x : bl_feed_z;

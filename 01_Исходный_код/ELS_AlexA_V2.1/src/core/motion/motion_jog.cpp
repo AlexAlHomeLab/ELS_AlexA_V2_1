@@ -257,6 +257,18 @@ static int32_t mpg_clamp_cmd_ahead(int32_t pos, int32_t cmd_tgt) {
     return cmd_tgt;
 }
 
+/* Ось «чужого» jog: не подставлять pos — иначе retarget затирает cruise другого источника */
+static int32_t jog_peer_axis_hold(uint8_t axis) {
+    if (axis == AXIS_X) {
+        if (joy_x_on) return dds_get_target(AXIS_X);
+        if (mpg_active && mpg_axis_last == AXIS_X) return dds_get_target(AXIS_X);
+    } else if (axis == AXIS_Z) {
+        if (joy_z_on) return dds_get_target(AXIS_Z);
+        if (mpg_active && mpg_axis_last == AXIS_Z) return dds_get_target(AXIS_Z);
+    }
+    return dds_get_position(axis);
+}
+
 static void mpg_session_halt(void) {  /* полный стоп MPG/jog + sync cmd */
     planner_jog_halt();
     mpg_active = 0;
@@ -298,8 +310,8 @@ static void mpg_approach_release(uint8_t axis, const SwitchState_t *sw, const Bu
         return;
     }
 
-    tx = dds_get_position(AXIS_X);
-    tz = dds_get_position(AXIS_Z);
+    tx = jog_peer_axis_hold(AXIS_X);
+    tz = jog_peer_axis_hold(AXIS_Z);
     if (axis == AXIS_X) {
         tx = cmd;
     } else {
@@ -446,9 +458,9 @@ static void mpg_planner_commit(uint8_t axis, const SwitchState_t *sw, const Butt
     uint8_t mpg_rapid;
     uint8_t lim_bypass;
 
-    tx = dds_get_position(AXIS_X);
-    tz = dds_get_position(AXIS_Z);
-    pos = (axis == AXIS_X) ? tx : tz;
+    pos = (axis == AXIS_X) ? dds_get_position(AXIS_X) : dds_get_position(AXIS_Z);
+    tx = jog_peer_axis_hold(AXIS_X);
+    tz = jog_peer_axis_hold(AXIS_Z);
     cmd_tgt = mpg_cmd[axis];
     was_cruise = dds_motion_jog_cruise_active();
     mpg_rapid = mpg_step_use_rapid(btn);
@@ -546,14 +558,19 @@ void motion_jog_zero_axis(uint8_t axis) {
     int32_t cur = motion_get_pos_steps(axis);
     if (go_lim_active && go_lim_axis == axis) {
         go_lim_active = 0;
-        go_lim_latch = 0;
         go_lim_joy_arm = 0;
+        go_lim_latch = 0;
     }
+    /* иначе MPG coast/jog тянет к старому mpg_cmd → ложная выборка люфта */
+    planner_jog_halt();
     limits_rebase_axis(axis, cur);
     motion_set_pos_steps(axis, 0);
-    hand_pos[axis] = 0;
+    hand_reset_axis(axis);
     ui_encoder_reset_mpg();
-    /* люфт не трогаем: обнуление — только координата */
+#if ENABLE_BACKLASH
+    backlash_sync_axis(axis,
+        (axis == AXIS_X) ? BACKLASH_REF_DIR_X : BACKLASH_REF_DIR_Z);
+#endif
 }
 
 void motion_jog_go_limit(uint8_t idx) {
@@ -773,17 +790,19 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
     if (now - joy_tick_ms < JOY_STEP_MS) return;
     joy_tick_ms = now;
 
-    tx = dds_get_position(AXIS_X);
-    tz = dds_get_position(AXIS_Z);
+    int32_t px = dds_get_position(AXIS_X);
+    int32_t pz = dds_get_position(AXIS_Z);
+    tx = x_on ? px : jog_peer_axis_hold(AXIS_X);
+    tz = z_on ? pz : jog_peer_axis_hold(AXIS_Z);
     int32_t ox = tx;
     int32_t oz = tz;
     uint8_t need_exec = 0U;
 
     if (z_on) {
         int32_t tgt_z = dds_get_target(AXIS_Z);
-        int32_t rem_z = (z_sign > 0) ? (tgt_z - tz) : ((z_sign < 0) ? (tz - tgt_z) : 0);
+        int32_t rem_z = (z_sign > 0) ? (tgt_z - pz) : ((z_sign < 0) ? (pz - tgt_z) : 0);
         if (rem_z < JOY_RUNWAY_REFRESH) {
-            int32_t base_z = (rem_z > 0) ? tgt_z : tz;
+            int32_t base_z = (rem_z > 0) ? tgt_z : pz;
             tz = jog_clamp_target(AXIS_Z, base_z + z_sign * JOY_RUNWAY_FILL, btn.joy_rapid);
             need_exec = 1U;
         } else {
@@ -792,9 +811,9 @@ void motion_jog_joy_poll(void) {  /* джойстик: chunk + lookahead, cruise
     }
     if (x_on) {
         int32_t tgt_x = dds_get_target(AXIS_X);
-        int32_t rem_x = (x_sign > 0) ? (tgt_x - tx) : ((x_sign < 0) ? (tx - tgt_x) : 0);
+        int32_t rem_x = (x_sign > 0) ? (tgt_x - px) : ((x_sign < 0) ? (px - tgt_x) : 0);
         if (rem_x < JOY_RUNWAY_REFRESH) {
-            int32_t base_x = (rem_x > 0) ? tgt_x : tx;
+            int32_t base_x = (rem_x > 0) ? tgt_x : px;
             tx = jog_clamp_target(AXIS_X, base_x + x_sign * JOY_RUNWAY_FILL, btn.joy_rapid);
             need_exec = 1U;
         } else {

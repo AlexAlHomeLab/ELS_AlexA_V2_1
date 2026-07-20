@@ -23,6 +23,7 @@ void backlash_abort_pending(void);                     /* отмена rem_x/rem
 
 int32_t backlash_pending(uint8_t axis);  /* оставшиеся шаги выборки */
 uint32_t backlash_get_arm_inc(uint8_t axis);           /* DDS increment при последнем arm */
+uint32_t backlash_get_min_inc(uint8_t axis);           /* BlMn → DDS increment (ISR) */
 float backlash_get_arm_feed_mm_min(uint8_t axis);      /* подача при последнем arm, мм/мин */
 
 /* 1 если шаг «съеден» люфтом (позиция не меняется) */

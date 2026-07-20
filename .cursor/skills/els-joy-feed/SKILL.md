@@ -3,8 +3,8 @@ name: els-joy-feed
 description: >-
   Спецификация и реализация джойстика подач для ELS AlexA V2.1 на Arduino Mega 2560.
   Используй при разработке, отладке и ревью motion_jog, ui_buttons, ui_pot, planner, limits
-  и FSM; когда пользователь упоминает джойстик подач, joy, rapid, go_lim, latch, pot feed
-  или ручные подачи X/Z.
+  и FSM; когда пользователь упоминает джойстик подач, joy, rapid, go_lim, latch, pot feed,
+  проезд лимита, защёлку или ручные подачи X/Z.
 ---
 
 # Джойстик подач (ELS AlexA V2.1)
@@ -14,7 +14,7 @@ description: >-
 ## Джойстик подач
 Четыре положения (влево, вправо, вперед (верх), назад (низ))
 Кнопка ускоренной подачи (rapid) включает максимальную настроенную скорость
-При нажатии кнопки ускоренной подачи в движении включается ускоренная подача, при отпускании выключается. 
+При нажатии кнопки ускоренной подачи в движении включается ускоренная подача, при отпускании выключается.
 Скорости для разгона, подачи, торможения задаются в параметрах отдельно для каждой оси
 Джойстик подач работает в ручном подрежиме, в автоциклах запускает цикл, прерывает цикл, возобновлет цикл.
 Скорость подач устанавливается потенциометром.
@@ -29,18 +29,18 @@ description: >-
 1. Прочитай [reference.md](reference.md) — карта файлов, API и поток данных.
 2. Правь **только** файлы джойстика/jog/limits/FSM; не трогай несвязанные режимы без запроса.
 3. Перед правками: кратко опиши **что** и **зачем**; жди подтверждения при нетривиальной логике.
-4. После правок пройди чеклист ниже.
+4. После правок пройди чеклист ниже. Не нарушай инварианты и закрытый список вариантов A–I.
 
 ## Карта кода (кратко)
 
 | Слой | Файл | Роль |
 |------|------|------|
 | HAL | `hal_pins.h` | `JOY_*_PIN` A8–A12, Port K |
-| UI | `ui_buttons.cpp` | опрос джойстика, GO_LIM, latch, rapid+limit |
+| UI | `ui_buttons.cpp` | опрос джойстика (`pressing`), GO_LIM, latch, rapid+limit |
 | UI | `ui_pot.cpp` | `ui_pot_get_jog_mm_min()` — скорость с потенциометра |
-| Логика | `motion_jog.cpp` | `motion_jog_joy_poll()`, go_lim, `jog_clamp_target` |
+| Логика | `motion_jog.cpp` | `motion_jog_joy_poll()`, go_lim, runway, `jog_clamp_target` |
 | Движение | `planner.cpp` | `planner_exec_jog(..., "JOY", cruise=1)` |
-| Конфиг | `config_machine.cpp` | max/rapid speed, feed_accel, jog_decel per axis/global |
+| Конфиг | `config_machine.cpp` | max/rapid speed, feed_accel, jog_decel |
 | FSM | `fsm_manager.cpp` | `motion_jog_joy_poll()` только в `STATE_MANUAL` |
 | Лимиты | `limits.cpp` | `limits_clamp_steps`, `limits_ui_go_target*` |
 
@@ -52,25 +52,81 @@ description: >-
 | Joy Right | A9 | Z | + |
 | Joy Up | A10 | X | + (вперёд) |
 | Joy Down | A11 | X | − (назад) |
-| Joy Rapid | A12 | — | моментальная ускоренная подача |
+| Joy Rapid | A12 | — | скорость / go_lim; APPROACH — только РГИ |
 
-Одновременно X и Z допустимы (диагональ). Для latch/GO_LIM — только одна ось (`joy_feed_dir`).
+Одновременно X и Z допустимы (диагональ). Для latch / выбора лимита по направлению — только одна ось (`joy_feed_dir`).
 
-## Скорость и параметры движения
+Опрос: `pressing()` + debounce; после menu save — `ui_buttons_reset_joy()`.
 
-### Обычная подача (без Rapid)
+---
 
-- Скорость: `ui_pot_get_jog_mm_min()` — потенциометр, min 10 мм/мин, cap `config_get_max_speed_mm_min(axis)`.
-- Разгон: `config_get_feed_accel(axis)` × 50 → мм/с² в planner/stepper_gen.
-- Торможение: тот же `feed_accel`; дистанция run-out — `config_get_jog_decel_steps()` (Jdec, глобально).
+## Полная логика (as-is) — закрытый список вариантов
 
-### Rapid (удержание A12)
+Движение от joy/лимитов/Rapid допускается **только** из таблицы ниже. Всё остальное запрещено.
 
-- Скорость: `config_get_rapid_speed_mm_min(axis)` — максимальная настроенная для оси.
-- Включение **только пока кнопка нажата** (`btn.joy_rapid = read()`), не latch.
-- Во время движения: нажал → rapid, отпустил → снова pot-speed.
+| # | Условие | Что происходит | Скорость | Лимиты |
+|---|---------|----------------|----------|--------|
+| A | Удержание направления, Rapid отпущен | Cruise jog, runway | pot (floor 10 мм/мин; для мм/об — 1), cap max | clamp |
+| B | Удержание направления + Rapid | То же runway, скорость на лету | `rapid_speed` оси | **без clamp — проезд** |
+| C | Отпускание всех направлений | `planner_jog_stop` (торможение / Jdec) | — | — |
+| D | Rapid + клик лимита (или клик Rapid при удержанном лимите) | `motion_jog_go_limit` | rapid | цель = лимит |
+| E | Подача (1 ось) + hold любой Lim* + лимит впереди по знаку | `motion_jog_go_limit_latch` (beep 40 мс); после отпускания joy — до лимита | pot | цель = лимит |
+| F | Hold Lim* без joy | Обнуление оси кнопки | — | — |
+| G | Любое направление joy при активном go_lim / latch | **Только стоп**; `go_lim_stop_joy` | — | — |
+| H | После G: пока joy нажат | Jog не стартует | — | — |
+| I | После G: отпустил → новое включение | Обычный A/B | как A/B | как A/B |
 
-### Per-axis в конфиге (EEPROM / меню)
+**Не в списке joy:** автоподвод APPROACH — только Rapid + РГИ + отпускание Rapid (skill `els-rgi-mpg`).
+
+### Runway (реализация A/B)
+
+- Период проверки: `JOY_STEP_MS` = 20 мс.
+- Если остаток до цели `< JOY_RUNWAY_REFRESH` (8192) → цель = base ± `JOY_RUNWAY_FILL` (16000).
+- `planner_exec_jog(..., "JOY", cruise=1)`; dual: `max(speed_X, speed_Z)`.
+- `joy_chunk` / `JOY_LOOKAHEAD` в joy-пути **не используются** (мёртвый код).
+
+### У лимита на обычной подаче (A)
+
+- Цель через `jog_clamp_target(..., rapid=0)` → `limits_clamp_steps`.
+- Стоим на лимите: в сторону лимита — не едем; в **свободную** сторону (или к другому активному лимиту) — едем.
+- У лимита при «цель = позиция»: cruise не гасим — можно обновить только скорость с пота.
+
+### Rapid: B vs D
+
+- Rapid во время удержания направления (B) = смена скорости и снятие clamp; **не** стоп и **не** latch.
+- Go_lim (D) — отдельный сценарий Rapid + кнопка лимита.
+
+### Защёлка (E) и стоп (G–I)
+
+1. Joy в направлении + long Lim* + активный лимит впереди → latch, pot-speed, beep 40 мс.
+2. Пока joy держат — `go_lim_joy_arm=0`; отпустили — arm=1, ход продолжается до лимита.
+3. Любое включение joy → `go_limit_stop`; повторный jog — только после полного отпускания и нового жеста.
+4. Пока `go_lim_active` — обычный A/B заблокирован; РГИ на этой оси тоже.
+
+---
+
+## Инварианты (обязательны при правках)
+
+1. **Изоляция:** joy работает отдельно от остальных режимов; не смешивать с автоциклами, чужими FSM и РГИ-APPROACH. Оси joy/РГИ изолированы (`jog_peer_axis_hold`: чужая ось — `target`, не `position`).
+2. **Нет переноса событий:** предыдущий жест не влияет на текущий (нет хвоста go_lim→jog, нет старта с того же удержания после стопа). **Исключение:** выборка люфта при смене направления (и pending backlash на старте).
+3. **Нет непредусмотренных движений:** только A–I (+ APPROACH только Rapid+РГИ+отпускание Rapid). Запрещены: автовозврат на лимит после проезда, подвод от отпускания Rapid без тиков РГИ, старт jog с того же нажатия после стопа go_lim, любые боковые ходы от смешения режимов.
+4. **У лимита (обычная подача):** блок только в сторону лимита; свободная / к другому лимиту — разрешена.
+5. **Проезд лимита:** только подача + Rapid (B). Возврат — только явным go_lim (D) или latch (E).
+
+---
+
+## Скорость и параметры
+
+### Обычная подача (A)
+
+- `ui_pot_get_jog_mm_min()`; floor 10 мм/мин (для `FEED_UNIT_MM_REV` — 1); cap `config_get_max_speed_mm_min(axis)`.
+- Разгон/торможение: `config_get_feed_accel(axis)`; run-out при отпускании — `config_get_jog_decel_steps()` (Jdec, глобально).
+
+### Rapid (B)
+
+- `config_get_rapid_speed_mm_min(axis)`; пока A12 нажата (`btn.joy_rapid = pressing()`).
+
+### Per-axis в конфиге
 
 | Параметр | Ось | Назначение |
 |----------|-----|------------|
@@ -79,98 +135,85 @@ description: >-
 | Feed accel | X, Z | разгон и торможение |
 | Jog decel steps | глобально | мин. шаги торможения при отпускании (Jdec) |
 
-## Правила реализации
+---
 
-### FSM и подрежимы
+## FSM
 
-- **Ручной подрежим (`STATE_MANUAL`)**: `motion_jog_joy_poll()` — непрерывная подача chunk + lookahead.
-- **Автоциклы (ext/int)**: джойстик управляет FSM:
-  - MANUAL → CYCLE — запуск цикла (клик/включение джойстика в подрежиме ext/int).
-  - CYCLE → PAUSED — прерывание (любое включение джойстика).
-  - PAUSED → CYCLE — возобновление.
-- В `STATE_CYCLE` / `STATE_PAUSED` jog-poll **не** вызывается — только FSM-логика цикла.
-- E-Stop блокирует jog и go_lim.
+- **`STATE_MANUAL`**: `motion_jog_joy_poll()` + `motion_jog_poll()` (РГИ).
+- E-Stop / MODE_OFF / `planner_startup_busy` — jog нет.
+- Вне MANUAL при нажатом joy — только лог `blk state`, jog не идёт.
+- **ТЗ:** в автоциклах joy → start / pause / resume. **As-is:** wiring не подключён (`fsm_cycle_*` есть, вызовов из joy нет).
 
-### Лимиты
+---
 
-- Обычная подача: цель через `jog_clamp_target(axis, target, rapid=0)` → `limits_clamp_steps`.
-- Rapid: `jog_clamp_target(..., rapid=1)` — **без** clamp; лимиты можно проскакивать.
-- У лимита при обычной подаче: если chunk не помещается — `planner_jog_stop`, позиция не меняется.
+## Связь с РГИ и APPROACH
 
-### GO_LIM и latch
+- Старт joy по оси → `hand_reset_axis` (сброс `hand_pos` / MPG).
+- РГИ блокируется, если joy держит ту же ось (`blk joy`).
+- **APPROACH только:** Rapid нажат → тики РГИ → отпускание Rapid → подвод к `mpg_cmd`. Без тиков — sync, хода нет. Joy+Rapid снимает arm APPROACH.
+- Подробности: skill `els-rgi-mpg`.
 
-- **GO_LIM (rapid)**: rapid + клик кнопки лимита (или rapid+limit hold) → `motion_jog_go_limit(idx)` — rapid speed, стоп при любом джойстике.
-- **Latch**: удержание джойстика в направлении + **длинное** нажатие **любой** кнопки лимита, если программный лимит активен в этом направлении → `motion_jog_go_limit_latch(idx)`:
-  - pot-speed (не rapid), движение до лимита;
-  - при успешном старте — короткий beep (`hal_buzzer_beep_ms(40)`), как при клике лимита;
-  - latch-arm: после отпускания джойстика движение продолжается;
-  - **любое** последующее включение джойстика — `go_limit_stop()` (без beep).
-- `go_lim_active` блокирует обычный jog и РГИ.
+## Связь с люфтом
 
-### Остановка движения
-
-- **Любое** включение джойстика останавливает текущее движение:
-  - go_lim (click или on) → `go_limit_stop`;
-  - при новом нажатии оси во время busy/backlash → `planner_jog_stop`;
-  - при отпускании всех направлений → `planner_jog_stop` (если не mpg_active).
-- Стоп go_lim/latch джойстиком — **только стоп**: `go_lim_stop_joy` держится, пока джойстик нажат; jog стартует только после отпускания и нового включения.
-- Rapid **не** отменяет движение — только меняет скорость на лету.
-
-### Связь с РГИ
-
-- Старт джойстика по оси → `hand_reset_axis(axis)` — сброс `hand_pos` РГИ и MPG-счётчика.
-- РГИ блокируется, если джойстик держит ту же ось (`blk joy` в `motion_jog_poll`).
-- При правках обоих модулей читай skill `els-rgi-mpg`.
-
-### Связь с люфтом
-
-- Старт джойстика по оси → через `hand_reset_axis` / planner — `backlash_sync_axis`.
+- Смена направления / старт оси — выборка люфта (единственная допустимая «память» между жестами).
 - go_lim у лимита: snap в пределах backlash → sync.
-- При правках читай skill `els-backlash`.
+- Skill: `els-backlash`.
 
-### Планировщик
+## Планировщик
 
-- Jog: `planner_exec_jog(tx, tz, jog_speed_dual_mm_min(rapid), "JOY", cruise=1, ...)`.
-- `cruise=1` — retarget без рывков при удержании (chunk каждые `JOY_STEP_MS` × `JOY_LOOKAHEAD`).
-- Dual-axis: скорость = max(speed_X, speed_Z).
+- `planner_exec_jog(..., "JOY", cruise=1)` — retarget без полной остановки.
+- `planner_jog_stop()` — отпускание направлений / стоп после go_lim.
+- Accel: `config_get_feed_accel(axis) * ACCEL_MM_S2_SCALE` (50 мм/с² per level).
+
+---
 
 ## Чеклист при правках
 
 ```
 - [ ] Четыре направления: Left/Right=Z, Up/Down=X
-- [ ] Rapid: read() моментально; rapid_speed per axis; без clamp лимитов
-- [ ] Обычная: pot → jog_mm_min, cap max_speed; clamp лимитов
-- [ ] feed_accel per axis; jog_decel (Jdec) при отпускании
-- [ ] STATE_MANUAL: joy_poll; циклы: start/pause/resume через FSM
-- [ ] go_lim rapid: стоп при любом джойстике
-- [ ] latch: joy hold + любая Lim* hold + лимит в направлении → до лимита; без joy → zero оси
-- [ ] latch: beep при успешном старте (`motion_jog_go_limit_latch`)
-- [ ] Любое включение джойстика останавливает go_lim / latch-arm
-- [ ] Стоп go_lim джойстиком: jog только после отпускания и нового включения
+- [ ] Только варианты A–I; нет побочных ходов
+- [ ] Rapid (B): pressing(); rapid_speed; без clamp (проезд)
+- [ ] Обычная (A): pot → jog_mm_min; clamp; у лимита — свободна обратная сторона
+- [ ] Runway 8192/16000; JOY_STEP_MS=20; не chunk×LOOKAHEAD
+- [ ] feed_accel per axis; Jdec при отпускании
+- [ ] STATE_MANUAL: joy_poll; изоляция от чужих режимов
+- [ ] go_lim (D): стоп при любом джойстике
+- [ ] latch (E): joy + Lim* hold + лимит в направлении; без joy → zero (F)
+- [ ] latch: beep 40 мс при старте
+- [ ] G–I: стоп go_lim/latch; jog только после отпускания и нового включения
+- [ ] APPROACH не от joy: только Rapid+РГИ+отпускание Rapid
+- [ ] Нет переноса событий кроме люфта при смене DIR
 - [ ] hand_reset_axis при старте оси; блок РГИ на той же оси
-- [ ] ui_buttons: read() для удержания (не pressing после EEPROM save)
+- [ ] ui_buttons: pressing() + ui_buttons_reset_joy() после EEPROM save
 - [ ] Минимальный diff, одна зона за раз
 - [ ] ISR: без тяжёлой логики
 ```
 
 ## Типичные ошибки
 
-1. **pressing() для joy hold** — ломается после `menu_save_all`; использовать `read()`.
-2. **Clamp при rapid** — нарушает ТЗ; `jog_clamp_target` только при `rapid=0`.
-3. **Rapid как latch** — rapid должен сниматься при отпускании A12.
-4. **joy_poll в STATE_CYCLE** — jog в цикле запрещён; только FSM pause/resume.
-5. **Latch без проверки направления лимита** — `limits_ui_go_target_dir`.
-6. **Не останавливать go_lim при joy** — любое включение джойстика = stop.
-7. **Забыть hand_reset** — накопитель РГИ не сбрасывается при jog.
+1. **Забыть `ui_buttons_reset_joy` после menu save** — ложные уровни joy.
+2. **Clamp при Rapid (B)** — нарушает ТЗ; проезд только при rapid=1.
+3. **Rapid как latch** — Rapid снимается при отпускании A12; latch — это E.
+4. **joy_poll вне STATE_MANUAL** — запрещено.
+5. **Latch без `limits_ui_go_target_dir`** — нужен лимит впереди по знаку.
+6. **Не останавливать go_lim при joy** — любое включение = stop (G).
+7. **Старт jog с того же удержания после стопа go_lim** — нужен H→I.
+8. **APPROACH от joy/Rapid без РГИ** — автоподвод только Rapid+РГИ+отпускание.
+9. **Автовозврат на лимит после проезда** — запрещён; только D или E.
+10. **Забыть hand_reset** — накопитель РГИ не сбрасывается при jog.
+11. **Retarget чужой оси через position** — сбрасывает runway; использовать `jog_peer_axis_hold`.
 
 ## Пробелы реализации (проверять при доработке)
 
-1. FSM: joy → start/pause/resume цикла — API есть (`fsm_cycle_*`), wiring из ui_buttons/fsm может быть неполным.
-2. `jog_decel_steps` — глобальный Jdec, не per-axis (если ТЗ требует per-axis decel — вынести в config).
-3. Отдельный feed decel per axis — сейчас accel=decel из одного `feed_accel`.
+1. FSM: joy → start/pause/resume цикла — API есть (`fsm_cycle_*`), wiring нет.
+2. `jog_decel_steps` — глобальный Jdec, не per-axis.
+3. Accel=decel из одного `feed_accel` (отдельного feed decel нет).
+4. `joy_chunk` / `JOY_LOOKAHEAD` — мёртвый код относительно joy-пути.
 
 ## Дополнительно
 
 - Карта API и поток данных: [reference.md](reference.md)
+- РГИ / APPROACH: skill `els-rgi-mpg`
+- Люфт: skill `els-backlash`
 - Документация: `02_Документация/STAGE_2_2.md`, `04_Промты_для_Cursor/03-fsm-manager.md`
 - Аппаратура: `02_Документация/HARDWARE.md` (JOY A8–A12, POT feed)
