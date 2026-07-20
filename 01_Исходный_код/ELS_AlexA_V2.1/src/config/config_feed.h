@@ -29,7 +29,7 @@ extern "C" {
 #define CONFIG_FEED_ASYNC_EDIT_MIN_LOW  10     /* меню: нижний предел min async */
 #define CONFIG_FEED_ASYNC_EDIT_MIN_HIGH 990    /* меню: верхний предел min async */
 #define CONFIG_FEED_ASYNC_EDIT_MAX_LOW  20     /* меню: нижний предел max async */
-#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 3000   /* меню: верхний предел max async */
+#define CONFIG_FEED_ASYNC_EDIT_MAX_HIGH 1200   /* меню: верхний предел max async */
 #define CONFIG_FEED_SYNC_EDIT_MIN_LOW   1      /* меню: нижний предел min sync (raw) */
 #define CONFIG_FEED_SYNC_EDIT_MIN_HIGH  199    /* меню: верхний предел min sync (raw) */
 #define CONFIG_FEED_SYNC_EDIT_MAX_LOW   2      /* меню: нижний предел max sync (raw) */

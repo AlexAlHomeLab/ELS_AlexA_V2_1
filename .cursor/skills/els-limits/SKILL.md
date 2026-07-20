@@ -81,13 +81,13 @@ description: >-
 
 ### Долгое нажатие (hold)
 
-- Любая кнопка лимита hold → `limits_ui_on_hold(idx)` → `motion_jog_zero_axis(axis)`:
+- **Без джойстика**: любая кнопка лимита hold → `limits_ui_on_hold(idx)` → `motion_jog_zero_axis(axis)`:
   - `limits_rebase_axis(axis, cur)` — физические точки лимитов сохраняются;
   - `motion_set_pos_steps(axis, 0)`;
   - `hand_pos[axis] = 0` (аккумулятор РГИ);
   - `ui_encoder_reset_mpg()`;
-  - `backlash_sync_axis`.
-- **Исключение LimL**: hold + джойстик в направлении активного лимита → latch (`motion_jog_go_limit_latch`) + короткий beep — см. `els-joy-feed`.
+  - люфт **не** трогать (`backlash_sync` не вызывать).
+- **С джойстиком** (одно направление): hold любой Lim* → latch к **ближайшему** активному лимиту впереди по направлению joy (`limits_ui_go_target_dir` → `motion_jog_go_limit_latch`); **zero не выполнять**. Если лимита нет / уже на нём — ничего.
 
 ### GO_LIM (rapid + лимит)
 
@@ -117,8 +117,8 @@ description: >-
 - [ ] Установка только Async + SUB_MANUAL + STATE_MANUAL
 - [ ] Без сохранения в EEPROM; limits_ui_init при boot
 - [ ] Второй лимит: min<max И dist > accel+decel
-- [ ] Hold: zero axis + rebase лимитов + hand_pos + mpg reset
-- [ ] LimL hold + joy → latch (не zero), если лимит в направлении
+- [ ] Hold без joy: zero axis + rebase лимитов + hand_pos + mpg reset; без backlash_sync
+- [ ] Hold + joy → latch к лимиту в направлении (не zero); любая Lim*
 - [ ] Rapid+limit → go_lim; стоп при joy click/on
 - [ ] clamp в jog/MPG; rapid go_lim без clamp
 - [ ] LCD: < > F B при pos == limit_pos
@@ -130,7 +130,7 @@ description: >-
 1. **Сохранение лимитов в EEPROM** — нарушает ТЗ; только RAM.
 2. **Установка лимита в Sync/Thread/цикле** — нужна проверка mode/submode/state.
 3. **can_set_limit только min<max** — забыта проверка dist accel+decel для второго лимита.
-4. **Hold всегда zero** — LimL+joy+лимит в направлении = latch, не zero.
+4. **Hold+joy → zero** — при joy hold любой Lim* = latch (не zero); zero только без joy.
 5. **rebase при zero** — без `limits_rebase_axis` лимиты «уплывут» относительно станка.
 6. **Путать кнопки Lim* и аппаратные LIMIT_* концевики** — разные пины и функции.
 7. **LCD-маркер при pos≈limit** — сейчас строго `==`; при доработке не ломать точное совпадение без запроса.
@@ -139,7 +139,7 @@ description: >-
 
 1. **Gating по режиму**: `limits_ui_on_click` вызывается без проверки Async/SUB_MANUAL — добавить по ТЗ.
 2. **Дистанция разгон+торможение**: `can_set_limit` проверяет только порядок min/max, не run-out.
-3. **Hold на всех Lim***: zero работает; latch только LimL — соответствует `els-joy-feed`.
+3. **Hold на всех Lim***: без joy — zero; с joy — latch к лимиту в направлении — соответствует `els-joy-feed`.
 
 ## Дополнительно
 

@@ -22,6 +22,12 @@ static uint8_t startup_pending = 0;  /* ждём завершения автов
 
 #define ACCEL_MM_S2_SCALE 50.0f  /* feed_accel → мм/с² */
 
+static void planner_jog_kind_flags(uint8_t *flags, const char *kind) {
+    if (kind && kind[0] == 'M' && kind[1] == 'P' && kind[2] == 'G' && kind[3] == '\0') {
+        *flags |= MOTION_FLAG_MPG;
+    }
+}
+
 static uint8_t prev_index(uint8_t idx) {
     return (uint8_t)((idx + BLOCK_BUFFER_SIZE - 1U) % BLOCK_BUFFER_SIZE);
 }
@@ -266,7 +272,7 @@ uint8_t planner_startup_busy(void) {
     return 0;
 }
 
-#define PLN_MAX_JOG_STEPS 4096U
+#define PLN_MAX_JOG_STEPS 16384U  /* запас cruise: ~0.5 с при ~30 кГц (было 4096 → рывки) */
 
 static int32_t pln_clamp_jog_target(int32_t pos, int32_t tgt) {
     int32_t d = tgt - pos;
@@ -306,6 +312,7 @@ uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char 
             cmd.target_z = tz;
             cmd.nominal_mm_min = speed_mm_min;
             cmd.flags = MOTION_FLAG_JOG | MOTION_FLAG_JOG_CRUISE;
+            planner_jog_kind_flags(&cmd.flags, kind);
             if (dds_motion_jog_retarget(&cmd)) {
                 return 1U;
             }
@@ -324,10 +331,17 @@ uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char 
     cmd.exit_mm_min = 0.0f;
     cmd.flags = MOTION_FLAG_JOG;
     if (cruise) cmd.flags |= MOTION_FLAG_JOG_CRUISE;
+    planner_jog_kind_flags(&cmd.flags, kind);
 
     extended = dds_motion_jog_retarget(&cmd);
     if (extended) {
         DBG_JOG_MOVE_LIM(kind, tx, tz, speed_mm_min, 1, lim_hit, lim_cmp, lim_cmp_stp);
+        block_exec = 1;
+        return 1U;
+    }
+
+    /* Живой jog-cruise: не stop+start (рывки разгона / повторный CRUISE) */
+    if (cruise && dds_motion_jog_cruise_active()) {
         block_exec = 1;
         return 1U;
     }

@@ -69,12 +69,14 @@ toggle limit_active; limit_pos = motion_get_pos_steps(axis)
 LIMIT_LED_ON/OFF; limit_beep()
 ```
 
-## Поток: hold (обнуление)
+## Поток: hold (обнуление / latch)
 
 ```
 ui_buttons_poll → btn.hold()
-       ↓ (LimL: joy+лимит в направлении → latch, см. els-joy-feed)
-limits_ui_on_hold(idx)
+       ↓
+joy вкл (одно направление)?
+  да → limits_ui_go_target_dir → motion_jog_go_limit_latch (zero нет)
+  нет → limits_ui_on_hold(idx)
        ↓
 motion_jog_zero_axis(axis)
        ↓
@@ -82,7 +84,7 @@ limits_rebase_axis(axis, cur)  /* limit_pos -= old_pos */
 motion_set_pos_steps(axis, 0)
 hand_pos[axis] = 0
 ui_encoder_reset_mpg()
-backlash_sync_axis(...)
+/* backlash не трогать */
 ```
 
 ## Поток: GO_LIM

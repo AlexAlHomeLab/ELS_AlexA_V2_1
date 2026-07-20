@@ -52,7 +52,7 @@ void motion_jog_go_limit_latch(uint8_t idx); /* latch до лимита */
 | `go_lim_active` | Движение к программному лимиту |
 | `go_lim_latch` | 1 = latch-режим |
 | `go_lim_joy_arm` | latch: 0 пока joy держат, 1 после отпускания |
-| `go_lim_stop_joy` | Флаг одноразовой паузы после stop |
+| `go_lim_stop_joy` | После stop go_lim джойстиком: блок jog до отпускания |
 
 ## Поток данных (обычный jog)
 
@@ -89,10 +89,10 @@ static int32_t joy_chunk(uint8_t axis, uint8_t rapid) {
 ```
 Rapid click + limit pressed     → motion_jog_go_limit(idx)     [rapid speed]
 Limit click + rapid held        → motion_jog_go_limit(idx)
-Limit LEFT hold + joy in dir    → motion_jog_go_limit_latch()  [pot speed, latch, beep 40 ms]
+Limit hold + joy in dir         → motion_jog_go_limit_latch()  [pot speed, latch, beep 40 ms]
 ```
 
-Проверка направления: `limits_ui_go_target_dir(axis, sign, &lim_idx, &target)`.
+Цель: `limits_ui_go_target_dir` — ближайший активный лимит оси впереди по sign.
 Beep latch: `hal_buzzer_beep_ms(40)` внутри `motion_jog_go_limit_latch` при успешном старте.
 ## FSM
 

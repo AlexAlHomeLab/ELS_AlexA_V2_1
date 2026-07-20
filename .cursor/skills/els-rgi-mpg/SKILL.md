@@ -13,7 +13,7 @@ description: >-
 
 ## Ручной генератор импульсов (РГИ)
 Выбор оси слектором оси x или z
-Выбор цены импульса: селектором 1 импульс РГИ равен 1 импульсу двигателя, селектором 1 импульс РГИ равен 0,01 мм. Нажанием кнопки ускоренной подачи 1 импульс РГИ равен 0,1 мм.
+Выбор цены импульса: селектором 1 импульс РГИ равен 1 импульсу двигателя, селектором 1 импульс РГИ равен 0,01 мм. В режиме LIVE нажатием кнопки ускоренной подачи 1 импульс РГИ равен 0,1 мм. В режиме точного подвода (APPROACH) Rapid не меняет цену импульса — шаг остаётся с селектора.
 Параметры движения РГИ соотвествуют настройкам текущей оси и текущей  скорости подачи
 Антидребезг импульсов РГИ
 РГИ ограничен лимитами.
@@ -50,13 +50,14 @@ description: >-
 
 ## Масштаб импульса
 
-Реализовано в `jog_steps_from_delta()` (`motion_jog.cpp`):
+Реализовано в `jog_steps_from_delta()` / `mpg_step_use_rapid()` (`motion_jog.cpp`):
 
 | Условие | Шаг на 1 тик РГИ |
 |---------|------------------|
-| `mpg_scale == 0`, без Rapid | 1 шаг двигателя (Xdia не влияет) |
-| `mpg_scale == 1`, без Rapid | `STEPS_PER_MM / 100` (0.01 мм радиуса) |
-| Rapid (`btn.joy_rapid`) | `STEPS_PER_MM / 10` (0.1 мм радиуса) |
+| `mpg_scale == 0` | 1 шаг двигателя (Xdia не влияет) |
+| `mpg_scale == 1` | `STEPS_PER_MM / 100` (0.01 мм радиуса) |
+| Rapid + `MPG_RAPID_MODE_LIVE` | `STEPS_PER_MM / 10` (0.1 мм радиуса) |
+| Rapid + `MPG_RAPID_MODE_APPROACH` | **как у селектора** (`mpg_scale`); Rapid не меняет шаг |
 
 ### Xdia = диаметр (только ось X, мм-масштабы)
 
@@ -65,23 +66,27 @@ description: >-
 | Масштаб | Радиус (машина) | Отображение диаметра |
 |---------|-----------------|----------------------|
 | 0.01 мм | `spm/200` (0.005 мм) | +0.01 |
-| Rapid 0.1 мм | `spm/20` (0.05 мм) | +0.1 |
+| Rapid 0.1 мм (только LIVE) | `spm/20` (0.05 мм) | +0.1 |
 
 Z и x1step без изменений. См. также `els-display-menu` (Xdia).
 
 ### Режим Rapid + РГИ (`config_mpg.h`)
 
 Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH`).
+**Только РГИ.** Джойстик Rapid (скорость / go_lim) APPROACH не использует и не армит.
 
 | Режим | Поведение при Rapid + вращении РГИ |
 |-------|-------------------------------------|
 | `MPG_RAPID_MODE_LIVE` | 0.1 мм/тик, движение сразу (`planner_exec_jog`, cruise=1), лимиты не clamp |
-| `MPG_RAPID_MODE_APPROACH` | 0.1 мм/тик, **только смена цели** (`mpg_cmd`); движение при **отпускании** Rapid (`cruise=0`, подача pot) |
+| `MPG_RAPID_MODE_APPROACH` | шаг с селектора (x1 / 0.01); **только смена цели** (`mpg_cmd`); движение при **отпускании** Rapid (`cruise=0`, скорость APPROACH) |
 
 - LCD: при нажатом Rapid строка MPG — `MPG>X …` / `MPG>Z …` (символ `>` после «MPG»).
 - В APPROACH при наборе цели лимиты **clamp** (в отличие от LIVE).
-- Фронт Rapid ↑: `hand_pos=0`, `mpg_cmd=position`, стоп активного MPG.
-- Фронт Rapid ↓: `mpg_approach_release()` → подвод к `mpg_cmd`.
+- Шаг тика: `mpg_step_use_rapid()` — 0.1 только в LIVE; в APPROACH всегда `mpg_scale`.
+- Фронт Rapid ↑: arm только если джойстик не держит подачу; иначе Rapid принадлежит JOY.
+- Joy включился при arm без тиков РГИ → снять arm (не мешать джойстику).
+- Фронт Rapid ↓: подвод к `mpg_cmd` только если были тики РГИ; иначе sync `mpg_cmd=pos` и стоп.
+- Подвод: `cruise=1` до цели, по `pos==cmd` — `planner_jog_halt` (без coast/lead/bl_drain); флаг `mpg_approach_go`.
 - Смена оси / halt: `mpg_rapid_prev=0` — при удержании Rapid повторный arm на новой оси.
 
 Селекторы: `ui_switches` — `mpg_scale` 0 = x1step (D15 LOW), 1 = 0.01mm (D14 LOW).
@@ -111,8 +116,10 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 
 - Импульсы одного направления суммируются в `mpg_cmd[axis]`; цель удлиняется без промежуточных остановок.
 - Каждый poll с новыми тиками → `planner_exec_jog` с `cruise=1` (единое движение без торможения между тиками).
-- `mpg_runway` + `MPG_LOOKAHEAD` — lookahead, чтобы DDS не догонял цель по одному шагу.
-- Простой `MPG_IDLE_STOP_MS` (80 мс) — финальная подача к `mpg_cmd` и `planner_jog_stop`.
+- Цель planner = `mpg_cmd`, при живых тиках + pad **за cmd** (`mpg_cmd±lead`, не `pos+lead` — иначе runaway).
+- Живой cruise: retarget; **не** stop+start при неудаче retarget (`planner.cpp`).
+- Реверс: ≤N игнор, >N — `planner_jog_stop`, сброс сессии (ТЗ).
+- `MPG_IDLE_MS` (2500): stop на pos; `dir_lock` после idle можно сменить после N.
 
 ### Накопитель `hand_pos`
 
@@ -130,10 +137,9 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 
 - ISR только инкрементирует `hand_count`; обработка в `loop` через `ui_encoder_consume_mpg_tick()` (по 1 тику).
 - Пакетная обработка: до `MPG_MAX_TICKS` (24) тиков за один poll.
-- **Смена направления во время движения:**
-  - Обратные тики ≤ `MPG_REV_IGNORE_TICKS` (N, константа в `motion_jog.cpp` или `config.h`) — игнорировать.
-  - Обратные тики > N — немедленно `dds_motion_stop()` + `planner_jog_stop()`, сброс активного MPG-движения, затем обработка нового направления.
-- Если N не задано в ТЗ — предложи значение 2–4 и вынеси в `#define`.
+- ТЗ: реверс ≤N игнор, >N стоп (N=3). На практике при `mpg_active`/cruise — **только игнор** (дребезг детентов иначе рвёт «одно движение»).
+- Смена направления — после `MPG_IDLE_MS` (`mpg_active=0`).
+- `mpg_dir_lock` липкий на сессию.
 
 ### Параметры движения РГИ
 
@@ -149,9 +155,10 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 
 ```
 - [ ] РГИ только STATE_MANUAL, не в циклах
-- [ ] Масштаб: 1 step / 0.01 mm / 0.1 mm (Rapid)
-- [ ] Xdia=диаметр, ось X: 0.01→0.005 мм, Rapid 0.1→0.05 мм радиуса; Z/x1 без изменений
-- [ ] MPG_RAPID_MODE: LIVE vs APPROACH; LCD `>` при Rapid
+- [ ] Масштаб: 1 step / 0.01 mm; 0.1 mm только Rapid+LIVE
+- [ ] Xdia=диаметр, ось X: 0.01→0.005 мм, Rapid LIVE 0.1→0.05 мм радиуса; Z/x1 без изменений
+- [ ] MPG_RAPID_MODE: LIVE (0.1) vs APPROACH (шаг с селектора); LCD `>` при Rapid
+- [ ] APPROACH: Rapid не меняет шаг; подвод при отпускании
 - [ ] Лимиты: clamp цели и фактические шаги в hand_pos
 - [ ] Накопление mpg_cmd при серии импульсов
 - [ ] cruise=1 в planner_exec_jog для MPG
@@ -169,6 +176,7 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 3. **Стоп между тиками РГИ** — ломает «одно движение»; нужен cruise + retarget.
 4. **РГИ в STATE_CYCLE** — нарушает ТЗ; проверять FSM, не только motion_jog.
 5. **Логика в ISR** — только `hand_mpg_isr_step()`, остальное в poll.
+6. **0.1 мм/тик в APPROACH** — Rapid не меняет шаг; только `mpg_scale`. 0.1 — через `mpg_step_use_rapid()` лишь в LIVE.
 
 ## Дополнительно
 

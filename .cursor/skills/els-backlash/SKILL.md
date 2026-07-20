@@ -111,6 +111,7 @@ REF-направление стартовой выборки: `BACKLASH_REF_DIR_
 | Завершение backlash-блока планировщика | `backlash_sync_axis(axis, REF_DIR)` |
 | Старт джойстика по оси (`hand_reset_axis`) | `backlash_sync_axis` — люфт «взят» |
 | GO_LIM в пределах backlash | `backlash_sync_axis` |
+| Hold zero оси (лимит) | **не** sync — только координата |
 | `motion_set_zero` без BlAu | `backlash_sync_axis` обеих осей |
 | E-Stop / полный стоп | `backlash_abort_pending` (rem=0, synced сохранён) |
 

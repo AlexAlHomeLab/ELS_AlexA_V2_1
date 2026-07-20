@@ -14,6 +14,7 @@ extern "C" {
 #define MOTION_FLAG_BACKLASH   0x01U  /* только выборка люфта по bl_axis */
 #define MOTION_FLAG_JOG        0x02U  /* ручная подача / джог */
 #define MOTION_FLAG_JOG_CRUISE 0x04U  /* джог без конечного торможения (круиз) */
+#define MOTION_FLAG_MPG        0x08U  /* РГИ: короткий ход без разгона джойстика */
 
 /* Команда движения от планировщика */
 typedef struct {

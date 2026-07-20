@@ -114,17 +114,19 @@
 #define LIMIT_LED_ON(p)  digitalWrite(p, LOW)    /* включить LED лимита (активный LOW) */
 #define LIMIT_LED_OFF(p) digitalWrite(p, HIGH)   /* выключить LED лимита */
 
-/* --- Макросы шаговиков — прямой доступ к PORT (для ISR) --- */
+/* --- Макросы шаговиков: прямой PORTL (D43–D49), без digitalPinToPort в ISR --- */
+#define STEP_X_ON()    (PORTL |= (1 << PL1))             /* D48 = PL1, фронт STEP X */
+#define STEP_X_OFF()   (PORTL &= (uint8_t)~(1 << PL1))   /* спад STEP X */
+#define STEP_Z_ON()    (PORTL |= (1 << PL0))             /* D49 = PL0, фронт STEP Z */
+#define STEP_Z_OFF()   (PORTL &= (uint8_t)~(1 << PL0))   /* спад STEP Z */
+#define DIR_X_SET(d)   do { if (d) PORTL |= (1 << PL5); else PORTL &= (uint8_t)~(1 << PL5); } while (0) /* D44 */
+#define DIR_Z_SET(d)   do { if (d) PORTL |= (1 << PL6); else PORTL &= (uint8_t)~(1 << PL6); } while (0) /* D43 */
+#define EN_X_ENABLE()  (PORTL |= (1 << PL3))             /* D46 = PL3, мотор X под током */
+#define EN_X_DISABLE() (PORTL &= (uint8_t)~(1 << PL3))   /* мотор X выкл */
+
+/* Общий HAL_PIN — для не-ISR (LED и т.п.) */
 #define HAL_PIN_HIGH(p) (*portOutputRegister(digitalPinToPort(p)) |= digitalPinToBitMask(p))
 #define HAL_PIN_LOW(p)  (*portOutputRegister(digitalPinToPort(p)) &= ~digitalPinToBitMask(p))
-#define DIR_X_SET(d)  ((d) ? HAL_PIN_HIGH(DIR_X_PIN) : HAL_PIN_LOW(DIR_X_PIN)) /* DIR X: 1=HIGH */
-#define DIR_Z_SET(d)  ((d) ? HAL_PIN_HIGH(DIR_Z_PIN) : HAL_PIN_LOW(DIR_Z_PIN)) /* DIR Z: 1=HIGH */
-#define STEP_X_ON()   HAL_PIN_HIGH(STEP_X_PIN)   /* фронт STEP X */
-#define STEP_X_OFF()  HAL_PIN_LOW(STEP_X_PIN)    /* спад STEP X */
-#define STEP_Z_ON()   HAL_PIN_HIGH(STEP_Z_PIN)   /* фронт STEP Z */
-#define STEP_Z_OFF()  HAL_PIN_LOW(STEP_Z_PIN)    /* спад STEP Z */
-#define EN_X_ENABLE()  HAL_PIN_HIGH(EN_X_PIN)    /* мотор X под током */
-#define EN_X_DISABLE() HAL_PIN_LOW(EN_X_PIN)     /* мотор X выкл */
 
 #define LIMIT_UP_PIN    LIMIT_FRONT_PIN          /* алиас: лимит «вверх» по X = Front */
 #define LIMIT_DOWN_PIN  LIMIT_REAR_PIN           /* алиас: лимит «вниз» по X = Rear */
