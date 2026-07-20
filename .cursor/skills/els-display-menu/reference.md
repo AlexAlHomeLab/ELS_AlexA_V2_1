@@ -188,3 +188,7 @@ Serial: `UI/MENU open|exit`, `CFG/DSP loaded|saved|migr|defaults`; `$47` Xdia
 3. Xdia 0/1 — буква R/D; мм ×2 до /den + round 0.001; шаги без ×2; MPG X.
 4. Меню: scroll 30 params (Xdia первый), edit, save → reboot.
 5. Exit menu → jog/joy работает (reset_joy).
+
+## Пробелы (ТЗ)
+
+1. Установка текущих координат: hold Left/Right (X целая/дробная) или Up/Down (Z) + РГИ на главном экране; commit на отпускании; без хода. См. SKILL.md; wiring нет. Изоляция РГИ — `els-rgi-mpg`.

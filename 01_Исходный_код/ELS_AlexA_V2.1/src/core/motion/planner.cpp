@@ -316,6 +316,7 @@ uint8_t planner_exec_jog(int32_t tx, int32_t tz, float speed_mm_min, const char 
             if (dds_motion_jog_retarget(&cmd)) {
                 return 1U;
             }
+            DBG_VERBOSE("PLN", kind ? kind : "JOG", "spd0 fail");
         }
         return 0U;
     }

@@ -121,16 +121,26 @@ static void log_limit_event(const char *name, VirtButton &btn, uint8_t idx) {
         int32_t target;
         if (joy_feed_dir(&axis, &sign)) {
             if (limits_ui_go_target_dir(axis, sign, &lim_idx, &target)) {
-                DBG_INFO("UI", "LATCH", name);
+                DBG_INFO_VAL("UI", "LATCH", name, (uint32_t)lim_idx);
                 motion_jog_go_limit_latch(lim_idx);
+            } else {
+                DBG_INFO_VAL("UI", "LATCH", "miss", (uint32_t)axis);
             }
             return;
+        }
+        if (btn_joy_left.pressing() || btn_joy_right.pressing() ||
+            btn_joy_up.pressing() || btn_joy_down.pressing()) {
+            DBG_INFO("UI", "LATCH", "dual");  /* диагональ — latch нет */
         }
         limits_ui_on_hold(idx);
         return;
     }
     if (btn.click()) {
         if (btn_joy_rapid.pressing()) {
+            if (!limits_ui_led_on(idx)) {
+                DBG_INFO_VAL("UI", "GOLIM", "miss", (uint32_t)idx);
+                return;
+            }
             DBG_INFO("UI", "GOLIM", name);
             motion_jog_go_limit(idx);
             return;
@@ -152,6 +162,10 @@ static void log_rapid_event(void) {
     if (btn_joy_rapid.click()) {
         uint8_t idx = limit_pressed_idx();
         if (idx != 0xFF) {
+            if (!limits_ui_led_on(idx)) {
+                DBG_INFO_VAL("UI", "GOLIM", "miss", (uint32_t)idx);
+                return;
+            }
             DBG_INFO("UI", "GOLIM", "Rapid");
             motion_jog_go_limit(idx);
             return;

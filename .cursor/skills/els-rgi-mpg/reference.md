@@ -116,8 +116,20 @@ if (st == STATE_MANUAL) {
 1. `MPG_REV_IGNORE_TICKS` (N) — логика игнора/стопа при смене направления
 2. `hand_pos` при лимите — только фактические шаги
 3. Отдельные `mpg_accel` / `mpg_decel` (если скорости по режимам потребуют другой профиль)
+4. Установка координат L/R/U/D + РГИ — ТЗ в SKILL.md / `els-display-menu`; wiring нет
+
+## Изоляция (кратко)
+
+РГИ не наследует состояние joy/go_lim/меню/set-coord. Единственная память между жестами — последнее направление оси для люфта. См. инварианты в SKILL.md.
 
 ## Отладка
 
-Serial debug-теги: `JOG/MPG`, `UI/AXIS`, `UI/SCALE`
+Serial (INFO — фронты; VERBOSE — пакеты/coast):
+- `JOG/MPG`: `run`, `halt`, `idle stop`, `dir`/`dir flip`, `rev ign`/`rev stop`, `lim`, `F x1|001|live|appr`
+- `JOG/MPG`: `arm` / `arm sync` / `arm joy` / `approach go|done|at tgt|fail|abort joy`
+- `JOG/MPG`: `blk estop|MODE_OFF|golim|joy`, `hand rst`, `startup sync`, `axis`
+- `MOT/MPG`: `DBG_MPG_PULSE`, `MOT/MPG … F…` / `ext` (planner)
+- `UI/AXIS`, `UI/SCALE`
+- VERBOSE: `ticks`/`cmd`/`hand`, `coast`, `batch commit`, `defer`, `rev ign`
+
 LCD строка 1: `MPG X +123` / `MPG Z -45` через `motion_jog_get_hand()`

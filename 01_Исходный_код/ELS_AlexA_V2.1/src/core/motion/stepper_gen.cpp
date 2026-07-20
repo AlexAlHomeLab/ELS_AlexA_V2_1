@@ -1148,6 +1148,17 @@ static int8_t motion_axis_move_sign(const AxisState_t *a) {
     return a->direction ? (int8_t)1 : (int8_t)-1;
 }
 
+/* Цель торможения jog: clamp к лимиту, но без разворота (после проезда Rapid). */
+static int32_t jog_release_clamp_tgt(uint8_t axis, int32_t pos, int8_t sign, uint32_t seg) {
+    int32_t raw = pos + (int32_t)sign * (int32_t)seg;
+    int32_t t = limits_clamp_steps(axis, raw);
+
+    if ((sign > 0 && t < pos) || (sign < 0 && t > pos)) {
+        return raw;
+    }
+    return t;
+}
+
 void dds_motion_jog_release(void) {  /* отпускание jog: торможение + докрутка люфта */
     TRACE_ENTER(TR_DDS_JOG_RELEASE);
     uint8_t sreg = SREG;
@@ -1203,7 +1214,7 @@ void dds_motion_jog_release(void) {  /* отпускание jog: торможе
             pz = axis_z.position;
 
             if (seg_x > 0U) {
-                axis_x.target_position = limits_clamp_steps(AXIS_X, px + sx * (int32_t)seg_x);
+                axis_x.target_position = jog_release_clamp_tgt(AXIS_X, px, sx, seg_x);
                 dds_enable(AXIS_X, 1U);
             } else {
                 axis_x.target_position = px;
@@ -1211,7 +1222,7 @@ void dds_motion_jog_release(void) {  /* отпускание jog: торможе
                 axis_x.step_increment = 0U;
             }
             if (seg_z > 0U) {
-                axis_z.target_position = limits_clamp_steps(AXIS_Z, pz + sz * (int32_t)seg_z);
+                axis_z.target_position = jog_release_clamp_tgt(AXIS_Z, pz, sz, seg_z);
                 dds_enable(AXIS_Z, 1U);
             } else {
                 axis_z.target_position = pz;

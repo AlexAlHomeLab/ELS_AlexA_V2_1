@@ -125,6 +125,8 @@ void fsm_manager_process(void) {
         motion_jog_poll();
     } else if (ui_buttons_feed_joy_on() && !blk_state_log) {
         DBG_INFO_VAL("FSM", "JOG", "blk state", (uint32_t)st);
+        DBG_INFO_VAL("FSM", "JOG", "mode", (uint32_t)current_mode);
+        DBG_INFO_VAL("FSM", "JOG", "sub", (uint32_t)current_submode);
         blk_state_log = 1;
     }
 

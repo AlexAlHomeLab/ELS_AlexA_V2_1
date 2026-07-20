@@ -150,6 +150,7 @@ description: >-
 
 - Старт joy по оси → `hand_reset_axis` (сброс `hand_pos` / MPG).
 - РГИ блокируется, если joy держит ту же ось (`blk joy`).
+- РГИ изолирован: предыдущие состояния не влияют на MPG, **кроме** DIR люфта — skill `els-rgi-mpg`.
 - **APPROACH только:** Rapid нажат → тики РГИ → отпускание Rapid → подвод к `mpg_cmd`. Без тиков — sync, хода нет. Joy+Rapid снимает arm APPROACH.
 - Подробности: skill `els-rgi-mpg`.
 

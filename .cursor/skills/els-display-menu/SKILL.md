@@ -4,7 +4,8 @@ description: >-
   Спецификация и реализация LCD 2004, главного экрана и меню параметров для ELS AlexA V2.1
   на Arduino Mega 2560. Используй при разработке, отладке и ревью ui_lcd, ui_menu,
   config_display, форматирования координат и строки Feed; когда пользователь упоминает
-  дисплей, LCD, меню, CrdU, Xdia, радиус/диаметр, единицы координат, ui_menu_lcd или главный экран.
+  дисплей, LCD, меню, CrdU, Xdia, радиус/диаметр, единицы координат, установку координаты
+  Left/Right/Up/Down+РГИ, ui_menu_lcd или главный экран.
 ---
 
 # Меню и дисплей (ELS AlexA V2.1)
@@ -23,14 +24,35 @@ description: >-
 длинное удержание Select в меню — сохранение в EEPROM и выход.
 Кнопки под дисплеем: Left/Right/Up/Down/Select — навигация и редактирование меню.
 
+## Установка текущего значения координат (ручной режим)
+В `STATE_MANUAL` на главном экране (меню закрыто): удержание кнопки под дисплеем + вращение РГИ
+меняет отображаемую координату **без хода** суппорта; отпускание кнопки фиксирует новое значение
+как **текущую** координату оси.
+
+| Удержание | Ось | Часть |
+|-----------|-----|--------|
+| Left      | X   | целая |
+| Right     | X   | дробная |
+| Up        | Z   | целая |
+| Down      | Z   | дробная |
+
+- Формат шага правки — как на LCD: CrdU (шаги / мм / дюймы); для X — ещё Xdia (радиус / диаметр).
+- Пока кнопка удерживается — превью на дисплее; тики РГИ **не** идут в jog/`motion_jog_poll` как движение.
+- Отпускание Left/Right/Up/Down — commit оси: sync позиции DDS, `hand`/`mpg_cmd`, rebase лимитов при необходимости.
+- Кнопки — `BTN_LEFT/RIGHT/UP/DOWN` (меню), **не** джойстик подач (`JOY_*`).
+- Изоляция РГИ при правке и в целом — skill `els-rgi-mpg` (инварианты).
+
+**As-is:** не реализовано (wiring нет).
+
 ## Быстрый старт для агента
 
 1. Прочитай [reference.md](reference.md) — карта файлов, API, таблица параметров, раскладка строк.
 2. Правь **только** ui_lcd / ui_menu / config_display / форматирование в `.ino`; не трогай motion без запроса.
 3. Перед правками: кратко опиши **что** и **зачем**; жди подтверждения при нетривиальной логике.
 4. После правок пройди чеклист ниже.
-5. Маркеры лимитов — skill `els-limits`; строка MPG — `els-rgi-mpg`; Feed/pot — `els-joy-feed`.
+5. Маркеры лимитов — skill `els-limits`; строка MPG / изоляция РГИ — `els-rgi-mpg`; Feed/pot — `els-joy-feed`.
 6. Драйвер LCD, выбор библиотеки, Timer5 — skill `els-lcd-libraries`.
+7. Установка координат Left/Right/Up/Down+РГИ — ТЗ выше; правки motion/РГИ согласовать с `els-rgi-mpg`.
 
 ## Карта кода (кратко)
 
@@ -150,6 +172,7 @@ EEPROM: magic `0xD2`, addr 70, checksum addr 73. Миграция с V1 magic `0
 - [ ] menu_save_all: все config_*_save; backlash_reload после Bl*
 - [ ] После save/exit: ui_buttons_reset_joy
 - [ ] ui_menu_is_active блокирует update_main_lcd
+- [ ] Установка координат (ТЗ): L/R→X целая/дробная, U/D→Z; commit на отпускании; без хода
 - [ ] Минимальный diff, один файл за раз
 - [ ] ISR: без тяжёлой логики и EEPROM
 ```
@@ -170,8 +193,8 @@ EEPROM: magic `0xD2`, addr 70, checksum addr 73. Миграция с V1 magic `0
 ## Связанные навыки
 
 - `els-limits` — маркеры `< > F B` в `lcd_format_axis_field`
-- `els-rgi-mpg` — `motion_jog_get_hand`, строка MPG
-- `els-joy-feed` — Feed, jog после меню
+- `els-rgi-mpg` — `motion_jog_get_hand`, строка MPG, изоляция РГИ, установка координат (ТЗ)
+- `els-joy-feed` — Feed, jog после меню (не путать с BTN_* для set-coord)
 - `els-backlash` — параметры Bl* в меню, экран BL takeup
 - `els-lcd-libraries` — LiquidCrystal / SafeAsync, `USE_LCD_*`, отказ от Timer5
 
