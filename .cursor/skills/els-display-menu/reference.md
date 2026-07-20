@@ -191,4 +191,10 @@ Serial: `UI/MENU open|exit`, `CFG/DSP loaded|saved|migr|defaults`; `$47` Xdia
 
 ## Пробелы (ТЗ)
 
-1. Установка текущих координат: hold Left/Right (X целая/дробная) или Up/Down (Z) + РГИ на главном экране; commit на отпускании; без хода. См. SKILL.md; wiring нет. Изоляция РГИ — `els-rgi-mpg`.
+*(нет — set-coord реализован; детали и инварианты — SKILL.md и `els-rgi-mpg`.)*
+
+## Set-coord на LCD (as-is)
+
+- Превью: `motion_jog_set_coord_preview(ax)` вместо `motion_get_pos_steps` для редактируемой оси.
+- Dirty: сравнивать `sc_on` / `sc_pos` с предыдущим кадром, иначе экран «замирает».
+- После commit координата = DDS; cooldown на стороне `motion_jog` (не LCD).

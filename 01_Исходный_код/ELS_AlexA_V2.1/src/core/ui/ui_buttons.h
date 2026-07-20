@@ -42,6 +42,10 @@ ButtonState_t ui_buttons_get_state(void);
 ButtonClicks_t ui_buttons_get_clicks(void);
 uint8_t ui_buttons_feed_joy_click(void);
 uint8_t ui_buttons_feed_joy_on(void);
+/* Set-coord: 0=нет, 1=Left, 2=Right, 3=Up, 4=Down (ровно одна L/R/U/D) */
+uint8_t ui_buttons_set_coord_id(void);
+/* 1 — любая L/R/U/D нажата (в т.ч. дребезг/две кнопки); блок MPG */
+uint8_t ui_buttons_set_coord_busy(void);
 
 #ifdef __cplusplus
 }

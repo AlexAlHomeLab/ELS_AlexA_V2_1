@@ -33,11 +33,28 @@ description: >-
 Работа РГИ **изолирована** от остальных функций (джойстик подач, go_lim/latch, меню, автоциклы, установка координат).
 Предыдущие состояния и жесты **не влияют** на РГИ, **кроме** последних направлений движения по осям — они нужны только для выборки люфта (`els-backlash`).
 
-## Установка координат кнопками дисплея + РГИ (ТЗ)
-На главном экране в `STATE_MANUAL` (меню закрыто): hold Left/Right (X целая/дробная) или Up/Down (Z целая/дробная) + вращение РГИ —
+## Установка координат кнопками дисплея + РГИ (ТЗ + as-is)
+
+На главном экране в `STATE_MANUAL` (меню закрыто): нажатие Left/Right (X целая/дробная) или Up/Down (Z целая/дробная) + вращение РГИ —
 правка отображаемой координаты **без хода**; отпускание — commit. Полное описание: skill `els-display-menu`.
-Пока hold — тики РГИ **не** в jog; режим правки не оставляет хвоста в сессии MPG после отпускания.
-**As-is:** не реализовано.
+
+**As-is (реализовано):**
+
+| Пункт | Реализация |
+|-------|------------|
+| Детект кнопки | `ui_buttons_set_coord_id()` — ровно одна L/R/U/D; `set_coord_busy()` — любая нажата |
+| Вход / блок MPG | **любая** L/R/U/D (в т.ч. дребезг) → discard+halt, MPG не едет; arm при ровно одной |
+| Release | только когда **все** L/R/U/D отпущены (`!busy`); `id==0` при дребезге ≠ release |
+| Тики | только в `sc_pos` (превью); `hand_pos` / `mpg_cmd` / planner **не** двигают оси |
+| Шаг | CrdU: целая = 1.000 ед. LCD, дробная = 0.001; Xdia=D — половина машинных шагов; дробная через `val1000` (999+1 → .000 с переносом) |
+| Полярность X | в set-coord знак тика по X **инвертирован** относительно хода РГИ (`set_coord_apply_tick`) |
+| LCD | `motion_jog_set_coord_preview` → `lcd_format_coords_line`; dirty учитывает `sc_on`/`sc_pos` |
+| Commit | отпускание: `limits_rebase_axis`, `motion_set_pos_steps`, sync `mpg_cmd` |
+| Хвост MPG | после release/zero — cooldown: **тишина** энкодера `SC_COOLDOWN_MS` (300 мс); тики продлевают окно |
+| Блокировки | menu / MODE_OFF / go_lim / joy → `SC blk *`; вне `STATE_MANUAL` → `SC blk state` (FSM) |
+| Zero оси | `motion_jog_zero_axis`: halt + sync + тот же cooldown (антидёрганье) |
+
+Отладка INFO: `SC press/release/arm/tick/commit/cool`/`cool end`, `SC blk *`. Не спамить `SC pos` каждый тик.
 ## Быстрый старт для агента
 
 1. Прочитай [reference.md](reference.md) — карта файлов и API.
@@ -51,11 +68,12 @@ description: >-
 |------|------|------|
 | ISR | `ui_encoder.cpp`, `hal_interrupts.cpp` | Счётчик `hand_count`, INT2 |
 | UI | `ui_switches.cpp` | `mpg_axis` (X/Z), `mpg_scale` (1:1 / 0.01 мм) |
-| Логика | `motion_jog.cpp` | `motion_jog_poll()`, `hand_pos[]`, `mpg_cmd[]` |
+| UI | `ui_buttons.cpp` | `ui_buttons_set_coord_id()` — raw Port F для set-coord |
+| Логика | `motion_jog.cpp` | `motion_jog_poll()`, `hand_pos[]`, `mpg_cmd[]`, set-coord (`sc_*`) |
 | Движение | `planner.cpp` | `planner_exec_jog(..., "MPG", cruise=1)` |
-| FSM | `fsm_manager.cpp` | РГИ только при `STATE_MANUAL` |
+| FSM | `fsm_manager.cpp` | РГИ/set-coord только при `STATE_MANUAL` |
 | Конфиг | `config_mpg.h` | `MPG_RAPID_MODE`, скорости РГИ по режимам |
-| LCD | `ELS_AlexA_V2.1.ino` | строка MPG, маркер `>` при Rapid |
+| LCD | `ELS_AlexA_V2.1.ino` | строка MPG, coords + превью set-coord, маркер `>` при Rapid |
 
 ## Масштаб импульса
 
@@ -117,8 +135,8 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 
 ### Инварианты изоляции (обязательны)
 
-1. **Изоляция:** РГИ работает отдельно от джойстика подач, go_lim/latch, меню, автоциклов и (когда будет) режима установки координат. Не смешивать цели/сессии и не переносить жесты между подсистемами.
-2. **Нет переноса состояний:** предыдущий жест (joy, go_lim, APPROACH arm, правка координат, смена режима) не влияет на текущую сессию РГИ — нет «хвоста» после чужого режима.
+1. **Изоляция:** РГИ работает отдельно от джойстика подач, go_lim/latch, меню, автоциклов и set-coord. Не смешивать цели/сессии и не переносить жесты между подсистемами.
+2. **Нет переноса состояний:** предыдущий жест (joy, go_lim, APPROACH arm, set-coord, смена режима) не влияет на текущую сессию РГИ — нет «хвоста» после чужого режима (после set-coord — cooldown 200 мс + discard тиков).
 3. **Исключение — люфт:** единственная допустимая «память» между жестами/источниками — **последнее направление движения по оси** для выборки люфта (`backlash` / DIR). Подробности: `els-backlash`.
 4. **Оси:** чужая ось при retarget — `jog_peer_axis_hold` (`target`, не `position`), чтобы не сбрасывать runway/сессию соседнего источника.
 5. **Конфликт с joy:** если джойстик держит ось селектора РГИ — блок (`blk joy`); старт joy по оси → `hand_reset_axis`.
@@ -184,7 +202,7 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 - [ ] hand_pos сброс только при старте джойстика по оси
 - [ ] Антидребезг: consume по 1 тику; reverse ≤N игнор, >N полный стоп
 - [x] Отдельные скорости РГИ: `MPG_SPEED_*` в config_mpg.h, `mpg_speed_mm_min()`
-- [ ] Set-coord (ТЗ): hold L/R/U/D + РГИ без хода; после отпускания — без хвоста в MPG
+- [x] Set-coord: L/R/U/D + РГИ без хода; X invert; frac wrap; release только `!busy`; quiet cooldown 300 мс
 - [ ] Минимальный diff, одна зона за раз
 - [ ] Производительность ISR: без тяжёлой логики в прерывании
 ```
@@ -199,7 +217,11 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 6. **0.1 мм/тик в APPROACH** — Rapid не меняет шаг; только `mpg_scale`. 0.1 — через `mpg_step_use_rapid()` лишь в LIVE.
 7. **Перенос состояния с joy/go_lim** — нарушает изоляцию; после чужого режима сессия MPG должна быть чистой (кроме DIR люфта).
 8. **Retarget чужой оси через position** — сбрасывает runway/сессию; `jog_peer_axis_hold`.
-
+9. **Set-coord ждать EncButton hold 600 мс** — до таймаута MPG едет; детект с первого нажатия (raw Port F).
+10. **Release по `id==0`** — дребезг/две кнопки дают ложный release → MPG с пальцем на кнопке; release только `!busy`.
+11. **Фиксированный cooldown без тишины** — хвост тиков после окна стартует `MPG run`; продлевать, пока `peek!=0`.
+12. **VERBOSE `SC pos` каждый тик** — спам Serial; только INFO на `arm`/`tick`(первый)/`commit`.
+13. **LCD dirty без `sc_pos`** — превью set-coord не обновляется на экране.
 ## Дополнительно
 
 - Пины и прерывания: [reference.md](reference.md)

@@ -29,7 +29,7 @@
 #define DEBUG_LEVEL_VERBOSE 3            /* максимум детализации */
 
 #ifndef DEBUG_LEVEL
-#define DEBUG_LEVEL DEBUG_LEVEL_VERBOSE     /* VERBOSE рвёт плавность РГИ (Serial) */
+#define DEBUG_LEVEL DEBUG_LEVEL_VERBOSE        /* INFO — фронты; VERBOSE спамит тики/ext/rw */
 #endif
 
 /* Трассировка краша: TRACE_ENTER(id) в цепочке MPG/jog (debug_trace.h) */

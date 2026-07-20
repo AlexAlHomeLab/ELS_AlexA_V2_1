@@ -99,10 +99,11 @@ static uint8_t read_mpg_axis(void) {
 
 static uint8_t read_mpg_scale(void) {
     uint8_t v = HAND_SCALE_PORT_RD();
+    /* D15 LOW (PJ0=0, v=0x02) → x1step; D14 LOW (PJ1=0, v=0x01) → 0.01 мм */
     if (v == 0x02) {
-        latched_mpg_scale = 0;  /* D14 LOW — x1step */
+        latched_mpg_scale = 0;  /* x1step */
     } else if (v == 0x01) {
-        latched_mpg_scale = 1;  /* D15 LOW — 0.01 мм */
+        latched_mpg_scale = 1;  /* 0.01 мм */
     }
     return latched_mpg_scale;
 }

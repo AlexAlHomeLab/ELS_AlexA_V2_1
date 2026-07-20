@@ -25,6 +25,7 @@ description: >-
 Кнопки под дисплеем: Left/Right/Up/Down/Select — навигация и редактирование меню.
 
 ## Установка текущего значения координат (ручной режим)
+
 В `STATE_MANUAL` на главном экране (меню закрыто): удержание кнопки под дисплеем + вращение РГИ
 меняет отображаемую координату **без хода** суппорта; отпускание кнопки фиксирует новое значение
 как **текущую** координату оси.
@@ -37,13 +38,13 @@ description: >-
 | Down      | Z   | дробная |
 
 - Формат шага правки — как на LCD: CrdU (шаги / мм / дюймы); для X — ещё Xdia (радиус / диаметр).
-- Пока кнопка удерживается — превью на дисплее; тики РГИ **не** идут в jog/`motion_jog_poll` как движение.
-- Отпускание Left/Right/Up/Down — commit оси: sync позиции DDS, `hand`/`mpg_cmd`, rebase лимитов при необходимости.
+- Детект: raw Port F — `set_coord_id` (ровно одна) + `set_coord_busy` (любая); MPG блокируется при busy.
+- Пока кнопка — превью (`sc_pos`); тики РГИ не в jog; дробная через val1000; X invert.
+- Release / commit — только когда **все** L/R/U/D отпущены; затем quiet cooldown 300 мс.
 - Кнопки — `BTN_LEFT/RIGHT/UP/DOWN` (меню), **не** джойстик подач (`JOY_*`).
-- Изоляция РГИ при правке и в целом — skill `els-rgi-mpg` (инварианты).
+- Изоляция РГИ — skill `els-rgi-mpg`.
 
-**As-is:** не реализовано (wiring нет).
-
+**As-is:** реализовано (`motion_jog` set-coord + LCD dirty/`sc_pos`).
 ## Быстрый старт для агента
 
 1. Прочитай [reference.md](reference.md) — карта файлов, API, таблица параметров, раскладка строк.
@@ -61,9 +62,10 @@ description: >-
 | HAL | `hal_pins.h` | `LCD_*_PIN`, `BTN_*_PIN` |
 | UI | `ui_lcd.cpp` | буфер 4×20, `set_line`, курсор, драйвер HD44780 |
 | UI | `ui_menu.cpp` | меню 30 параметров, browse/edit, EEPROM save |
-| UI | `ui_buttons.cpp` | клики Select/Up/Down/L/R для меню |
+| UI | `ui_buttons.cpp` | клики Select/Up/Down/L/R для меню; `ui_buttons_set_coord_id()` |
 | Конфиг | `config_display.cpp` | CrdU, Xdia, EEPROM $70 |
-| Главный экран | `ELS_AlexA_V2.1.ino` | `update_main_lcd()`, формат координат |
+| Главный экран | `ELS_AlexA_V2.1.ino` | `update_main_lcd()`, формат координат + превью set-coord |
+| Motion | `motion_jog.cpp` | set-coord: `sc_pos`, commit, cooldown |
 | Feed | `ui_pot.cpp` | `ui_pot_feed_format()` — строка F: |
 
 ## Главный экран (4 строки)
@@ -172,7 +174,7 @@ EEPROM: magic `0xD2`, addr 70, checksum addr 73. Миграция с V1 magic `0
 - [ ] menu_save_all: все config_*_save; backlash_reload после Bl*
 - [ ] После save/exit: ui_buttons_reset_joy
 - [ ] ui_menu_is_active блокирует update_main_lcd
-- [ ] Установка координат (ТЗ): L/R→X целая/дробная, U/D→Z; commit на отпускании; без хода
+- [x] Установка координат: L/R→X целая/дробная, U/D→Z; raw press; commit + cooldown; без хода
 - [ ] Минимальный diff, один файл за раз
 - [ ] ISR: без тяжёлой логики и EEPROM
 ```
@@ -187,13 +189,16 @@ EEPROM: magic `0xD2`, addr 70, checksum addr 73. Миграция с V1 magic `0
 6. **coords без set_line_raw** — сбивание выравнивания X/Z полей.
 7. **CrdU без config_display_save** — единицы не переживают reboot.
 8. **Xdia ×2 после trunc** — даёт только чётные 0.002; ×2 в числителе до `/den` + round.
-9. **Xdia ×2 в position API** — координаты в steps не удваивать. РГИ мм по X — половина (`els-rgi-mpg`).
-10. **РГИ без учёта Xdia** — в диаметре тик 0.01 даёт +0.02 на экране; править `jog_steps_from_delta`.
+9. **LCD dirty без учёта set-coord preview** — координаты на экране не двигаются при правке.
+10. **Set-coord через EncButton hold** — до 600 мс MPG едет; нужен raw Port F.
+11. **Release по id==0** — дребезг даёт ложный release → импульсы MPG; только `!busy`.
+12. **Xdia ×2 в position API** — координаты в steps не удваивать. РГИ мм по X — половина (`els-rgi-mpg`).
+13. **РГИ без учёта Xdia** — в диаметре тик 0.01 даёт +0.02 на экране; править `jog_steps_from_delta`.
 
 ## Связанные навыки
 
 - `els-limits` — маркеры `< > F B` в `lcd_format_axis_field`
-- `els-rgi-mpg` — `motion_jog_get_hand`, строка MPG, изоляция РГИ, установка координат (ТЗ)
+- `els-rgi-mpg` — `motion_jog_get_hand`, строка MPG, изоляция РГИ, set-coord
 - `els-joy-feed` — Feed, jog после меню (не путать с BTN_* для set-coord)
 - `els-backlash` — параметры Bl* в меню, экран BL takeup
 - `els-lcd-libraries` — LiquidCrystal / SafeAsync, `USE_LCD_*`, отказ от Timer5

@@ -7,6 +7,7 @@
 #include "../motion/planner.h"
 #include "../process/estop_control.h"
 #include "../ui/ui_buttons.h"
+#include "../ui/ui_menu.h"
 #include "../ui/ui_switches.h"
 #include "../../config/config.h"
 #include "../../modes/mode_async/mode_async.h"
@@ -101,13 +102,21 @@ void fsm_manager_process(void) {
     State_t st;
     static uint8_t blk_startup_log = 0;
     static uint8_t blk_state_log = 0;
+    static uint8_t blk_sc_state_log = 0;
+    uint8_t sc_hold;
 
     planner_process();
+
+    sc_hold = ui_buttons_set_coord_id();
 
     if (planner_startup_busy()) {
         if (!blk_startup_log && ui_buttons_feed_joy_on()) {
             DBG_INFO("FSM", "JOG", "blk startup");
             blk_startup_log = 1;
+        }
+        if (sc_hold && !ui_menu_is_active() && !blk_sc_state_log) {
+            DBG_INFO("JOG", "SC", "blk startup");
+            blk_sc_state_log = 1;
         }
         return;
     }
@@ -121,13 +130,26 @@ void fsm_manager_process(void) {
 
     if (st == STATE_MANUAL) {
         blk_state_log = 0;
+        blk_sc_state_log = 0;
         motion_jog_joy_poll();
         motion_jog_poll();
-    } else if (ui_buttons_feed_joy_on() && !blk_state_log) {
-        DBG_INFO_VAL("FSM", "JOG", "blk state", (uint32_t)st);
-        DBG_INFO_VAL("FSM", "JOG", "mode", (uint32_t)current_mode);
-        DBG_INFO_VAL("FSM", "JOG", "sub", (uint32_t)current_submode);
-        blk_state_log = 1;
+    } else {
+        if (ui_buttons_feed_joy_on() && !blk_state_log) {
+            DBG_INFO_VAL("FSM", "JOG", "blk state", (uint32_t)st);
+            DBG_INFO_VAL("FSM", "JOG", "mode", (uint32_t)current_mode);
+            DBG_INFO_VAL("FSM", "JOG", "sub", (uint32_t)current_submode);
+            blk_state_log = 1;
+        }
+        /* L/R/U/D без MANUAL — set-coord не работает */
+        if (sc_hold && !ui_menu_is_active() && !blk_sc_state_log) {
+            DBG_INFO_VAL("JOG", "SC", "blk state", (uint32_t)st);
+            DBG_INFO_VAL("JOG", "SC", "mode", (uint32_t)current_mode);
+            DBG_INFO_VAL("JOG", "SC", "sub", (uint32_t)current_submode);
+            blk_sc_state_log = 1;
+        }
+        if (!sc_hold) {
+            blk_sc_state_log = 0;
+        }
     }
 
     switch (current_mode) {

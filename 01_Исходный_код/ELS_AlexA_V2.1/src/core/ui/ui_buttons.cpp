@@ -29,6 +29,47 @@ static ButtonState_t btn_state;
 static ButtonClicks_t btn_clicks;
 static uint8_t feed_joy_click_flag;
 static uint8_t joy_trace_mask = 0;
+/* Set-coord: raw Port F — id (ровно одна) и busy (любая L/R/U/D) */
+static uint8_t sc_hold_id;
+static uint8_t sc_hold_busy;
+
+/* Маска PF0–3: бит0=Down … бит3=Left (активный LOW → 1 в маске) */
+static uint8_t sc_menu_btn_mask(void) {
+    uint8_t p = (uint8_t)MENU_BTN_PORT_RD();
+    uint8_t m = 0U;
+
+    if ((p & 0x01U) == 0U) m |= 1U;  /* Down  A0 PF0 */
+    if ((p & 0x02U) == 0U) m |= 2U;  /* Up    A1 PF1 */
+    if ((p & 0x04U) == 0U) m |= 4U;  /* Right A2 PF2 */
+    if ((p & 0x08U) == 0U) m |= 8U;  /* Left  A3 PF3 */
+    return m;
+}
+
+/* Ровно одна кнопка: 1=L 2=R 3=U 4=D; иначе 0 (отпускание / дребезг / две) */
+static uint8_t sc_menu_btn_id_from_mask(uint8_t m) {
+    if (m == 8U) return 1U;  /* Left */
+    if (m == 4U) return 2U;  /* Right */
+    if (m == 2U) return 3U;  /* Up */
+    if (m == 1U) return 4U;  /* Down */
+    return 0U;
+}
+
+static void sc_hold_poll(void) {
+    uint8_t m = sc_menu_btn_mask();
+    uint8_t id = sc_menu_btn_id_from_mask(m);
+    uint8_t busy = (m != 0U) ? 1U : 0U;
+
+    sc_hold_busy = busy;
+    if (id != sc_hold_id) {
+        if (id != 0U) {
+            DBG_INFO_VAL("JOG", "SC", "press", (uint32_t)id);
+        } else if (sc_hold_id != 0U && !busy) {
+            /* только полный отпуск всех L/R/U/D — не дребезг/две кнопки */
+            DBG_INFO_VAL("JOG", "SC", "release", (uint32_t)sc_hold_id);
+        }
+        sc_hold_id = id;
+    }
+}
 
 static uint8_t joy_read_mask(void) {
     uint8_t m = 0;
@@ -93,6 +134,8 @@ void ui_buttons_init(void) {
     set_btn_level(btn_limit_rear);
     memset(&btn_state, 0, sizeof(btn_state));
     memset(&btn_clicks, 0, sizeof(btn_clicks));
+    sc_hold_id = 0;
+    sc_hold_busy = 0;
 }
 
 static uint8_t joy_feed_dir(uint8_t *axis, int8_t *sign) {
@@ -232,7 +275,16 @@ void ui_buttons_poll(void) {
     btn_state.limit_right = btn_limit_right.pressing();
     btn_state.limit_rear = btn_limit_rear.pressing();
 
+    sc_hold_poll();
     joy_trace_poll();
+}
+
+uint8_t ui_buttons_set_coord_id(void) {
+    return sc_hold_id;
+}
+
+uint8_t ui_buttons_set_coord_busy(void) {
+    return sc_hold_busy;
 }
 
 ButtonState_t ui_buttons_get_state(void) {
@@ -268,5 +320,7 @@ void ui_buttons_reset_menu(void) {
     btn_up.reset();
     btn_down.reset();
     btn_select.reset();
+    sc_hold_id = 0;
+    sc_hold_busy = 0;
     DBG_INFO("UI", "BTN", "rst menu");
 }

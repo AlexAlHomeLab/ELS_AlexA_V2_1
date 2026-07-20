@@ -116,20 +116,30 @@ if (st == STATE_MANUAL) {
 1. `MPG_REV_IGNORE_TICKS` (N) — логика игнора/стопа при смене направления
 2. `hand_pos` при лимите — только фактические шаги
 3. Отдельные `mpg_accel` / `mpg_decel` (если скорости по режимам потребуют другой профиль)
-4. Установка координат L/R/U/D + РГИ — ТЗ в SKILL.md / `els-display-menu`; wiring нет
+
+## Set-coord (as-is)
+
+- API: `motion_jog_set_coord_active/axis/preview`, `ui_buttons_set_coord_id()`, `ui_buttons_set_coord_busy()`
+- Константа: `SC_COOLDOWN_MS` = 300; таймер сбрасывается при тиках во время cool
+- Release: только `!busy` (все L/R/U/D HIGH); не путать с `id==0` (дребезг)
+- Поток: any-busy gate → arm(id) → тики в `sc_pos` → release `!busy` → quiet cooldown → MPG
+- X: тик инвертирован в `set_coord_apply_tick`
 
 ## Изоляция (кратко)
 
-РГИ не наследует состояние joy/go_lim/меню/set-coord. Единственная память между жестами — последнее направление оси для люфта. См. инварианты в SKILL.md.
+РГИ не наследует состояние joy/go_lim/меню/set-coord. Единственная память между жестами — последнее направление оси для люфта. См. инварианты в SKILL.md. После set-coord — cooldown, не «тихий» хвост в `mpg_cmd`.
 
 ## Отладка
 
-Serial (INFO — фронты; VERBOSE — пакеты/coast):
+Serial (по умолчанию INFO — фронты без спама; VERBOSE — пакеты/coast, рвёт плавность):
 - `JOG/MPG`: `run`, `halt`, `idle stop`, `dir`/`dir flip`, `rev ign`/`rev stop`, `lim`, `F x1|001|live|appr`
 - `JOG/MPG`: `arm` / `arm sync` / `arm joy` / `approach go|done|at tgt|fail|abort joy`
 - `JOG/MPG`: `blk estop|MODE_OFF|golim|joy`, `hand rst`, `startup sync`, `axis`
-- `MOT/MPG`: `DBG_MPG_PULSE`, `MOT/MPG … F…` / `ext` (planner)
+- `JOG/SC`: `press`/`release`, `arm`, `tick` (первый), `commit`, `cool`, `cool end`, `blk menu|MODE_OFF|golim|joy|state|startup`
+- `MOT/MPG`: `DBG_MPG_PULSE`, `MOT/MPG … F…` / `ext` (planner; `ext` только VERBOSE)
 - `UI/AXIS`, `UI/SCALE`
-- VERBOSE: `ticks`/`cmd`/`hand`, `coast`, `batch commit`, `defer`, `rev ign`
+- VERBOSE: `ticks`/`cmd`/`hand`, `coast`/`idle catch` (1× на фазу), `batch commit`, `defer`, `rev ign`
+- **Не** логировать `SC pos` каждый тик
 
 LCD строка 1: `MPG X +123` / `MPG Z -45` через `motion_jog_get_hand()`
+LCD строка 2–3: при set-coord — `sc_pos` через `motion_jog_set_coord_preview`

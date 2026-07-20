@@ -75,6 +75,9 @@ typedef struct {
     uint8_t bl_auto;
     uint8_t joy_rapid;
     uint32_t spindle_rpm; /* для экрана MODE_OFF */
+    uint8_t sc_on;        /* 1 — превью set-coord */
+    uint8_t sc_axis;
+    int32_t sc_pos;
 } LcdMainCache_t;
 
 static LcdMainCache_t lcd_cache;
@@ -274,10 +277,21 @@ static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_
     lcd_mpg[LCD_COLS] = 0;
 }
 
-/* Строка 4 LCD: X/Z по 10 символов, хвост пробелами — без \0 внутри 20 байт. */
+/* Строка 4 LCD: X/Z по 10 символов, хвост пробелами — без \0 внутри 20 байт.
+ * При set-coord (hold L/R/U/D+РГИ) — превью оси без физического хода. */
 static void lcd_format_coords_line(char *buf, size_t len) {
     int32_t xs = motion_get_pos_steps(AXIS_X);
     int32_t zs = motion_get_pos_steps(AXIS_Z);
+    uint8_t sc_axis;
+    int32_t sc_pos;
+
+    if (motion_jog_set_coord_preview(&sc_axis, &sc_pos)) {
+        if (sc_axis == AXIS_X) {
+            xs = sc_pos;
+        } else {
+            zs = sc_pos;
+        }
+    }
     lcd_format_axis_field(lcd_xf, AXIS_X, xs, limits_lcd_marker(AXIS_X));
     lcd_format_axis_field(lcd_zf, AXIS_Z, zs, limits_lcd_marker(AXIS_Z));
     if (len <= LCD_COLS) {
@@ -427,6 +441,13 @@ static void lcd_cache_save_main(void) {
     lcd_cache.bl_auto = config_backlash_get_auto_on();
     lcd_cache.joy_rapid = ui_buttons_get_state().joy_rapid;
     lcd_cache.spindle_rpm = spindle_get_rpm();
+    {
+        uint8_t sca;
+        int32_t scp;
+        lcd_cache.sc_on = motion_jog_set_coord_preview(&sca, &scp);
+        lcd_cache.sc_axis = sca;
+        lcd_cache.sc_pos = scp;
+    }
 }
 
 /* Дешёвая проверка: форматировать только при изменении данных LCD. */
@@ -453,6 +474,9 @@ static void lcd_mark_dirty_if_changed(void) {
     uint16_t pot = ui_pot_get_value();
     uint8_t joy_rapid = ui_buttons_get_state().joy_rapid;
     uint32_t rpm = spindle_get_rpm();
+    uint8_t sca = 0;
+    int32_t scp = 0;
+    uint8_t sc_on = motion_jog_set_coord_preview(&sca, &scp);
 
     if (startup != lcd_cache.startup_busy ||
         mode != lcd_cache.fsm_mode ||
@@ -468,7 +492,9 @@ static void lcd_mark_dirty_if_changed(void) {
         pot != lcd_cache.pot_filtered ||
         joy_rapid != lcd_cache.joy_rapid ||
         (sw.mode_off && rpm != lcd_cache.spindle_rpm) ||
-        config_backlash_get_auto_on() != lcd_cache.bl_auto) {
+        config_backlash_get_auto_on() != lcd_cache.bl_auto ||
+        sc_on != lcd_cache.sc_on ||
+        (sc_on && (sca != lcd_cache.sc_axis || scp != lcd_cache.sc_pos))) {
         lcd_dirty = 1;
     }
 
