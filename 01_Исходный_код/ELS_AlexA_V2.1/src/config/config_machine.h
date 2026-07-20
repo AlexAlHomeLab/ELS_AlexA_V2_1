@@ -10,8 +10,8 @@
 #define AXIS_X_MOTOR_STEPS_DEFAULT      3000   /* полных шагов двигателя на оборот */
 #define AXIS_X_MICROSTEP_DEFAULT        1      /* делитель микрошага драйвера */
 #define AXIS_X_SCREW_PITCH_DEFAULT      100    /* шаг винта ×100: 1.00 мм */
-#define AXIS_X_MAX_SPEED_DEFAULT        600    /* макс. рабочая подача, мм/мин */
-#define AXIS_X_RAPID_SPEED_DEFAULT      600    /* rapid джойстика, мм/мин */
+#define AXIS_X_MAX_SPEED_DEFAULT        130    /* макс. рабочая подача, мм/мин */
+#define AXIS_X_RAPID_SPEED_DEFAULT      130    /* rapid джойстика, мм/мин */
 #define AXIS_X_FEED_ACCEL_DEFAULT       3      /* уровень ускорения (×50 мм/с²) */
 
 /* --- Заводские параметры оси Z --- */
@@ -35,11 +35,11 @@
 
 /* --- Допустимые диапазоны (меню / EEPROM) --- */
 #define AXIS_MOTOR_STEPS_MIN            50     /* мин. шагов двигателя на оборот */
-#define AXIS_MOTOR_STEPS_MAX            4000   /* макс. шагов двигателя на оборот */
+#define AXIS_MOTOR_STEPS_MAX            2000   /* макс. шагов двигателя на оборот */
 #define AXIS_MICROSTEP_MIN              1      /* мин. микрошаг */
 #define AXIS_MICROSTEP_MAX              32     /* макс. микрошаг */
 #define AXIS_SCREW_PITCH_MIN            10     /* мин. шаг винта ×100: 0.10 мм */
-#define AXIS_SCREW_PITCH_MAX            1000   /* макс. шаг винта ×100: 10.00 мм */
+#define AXIS_SCREW_PITCH_MAX            2000   /* макс. шаг винта ×100: 10.00 мм */
 #define AXIS_MAX_SPEED_MIN              10     /* мин. max_speed, мм/мин */
 #define AXIS_MAX_SPEED_MAX              5000   /* макс. max_speed, мм/мин */
 #define AXIS_RAPID_SPEED_MIN            10     /* мин. rapid, мм/мин */
