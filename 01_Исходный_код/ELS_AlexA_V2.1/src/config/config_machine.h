@@ -20,8 +20,8 @@
 #define AXIS_X_DIR_INVERT_DEFAULT       1      /* 1 — реверс DIR оси X */
 #endif
 /* Люфт: заводские шаги / сотые мм (EEPROM BlX; рантайм config_backlash) */
-#define BACKLASH_X_STEPS_DEFAULT        520   /* ~0.03 мм при 100 шаг/мм */
-#define BACKLASH_X_CENTIMM              34     /* запас при steps=0, сотые мм */
+#define BACKLASH_X_STEPS_DEFAULT        440   /* ~0.03 мм при 100 шаг/мм */
+#define BACKLASH_X_CENTIMM              0     /* запас при steps=0, сотые мм */
 #define BACKLASH_REF_DIR_X              BACKLASH_DIR_NEG  /* стартовая выборка */
 /* РГИ, мм/мин (прошивка; clamp к max_speed оси) */
 #define MPG_SPEED_X1_X_MM_MIN           12     /* 1 шаг/тик */
@@ -44,7 +44,7 @@
 #endif
 /* Люфт (EEPROM BlZ) */
 #define BACKLASH_Z_STEPS_DEFAULT        521    /* ~0.08 мм при 100 шаг/мм */
-#define BACKLASH_Z_CENTIMM              46     /* запас при steps=0, сотые мм */
+#define BACKLASH_Z_CENTIMM              0     /* запас при steps=0, сотые мм */
 #define BACKLASH_REF_DIR_Z              BACKLASH_DIR_NEG
 /* РГИ: полярность тиков (mpg_adjust_tick_sign); скорости мм/мин */
 #ifndef MPG_AXIS_Z_INVERT
@@ -63,6 +63,7 @@
 #define JOG_DECEL_STEPS_MAX             2000   /* верхний предел Jdec в меню */
 #define JOG_DECEL_STEPS_MAX_RUN         200    /* потолок дистанции торможения в рантайме */
 /* ========== Шпиндель / sync (не ось, EEPROM PPR) ========== */
+#define ENABLE_SPINDLE_ENCODER          1      /* 1 — INT0 энкодера; 0 — прерывание не вешается */
 #define SPINDLE_PPR_DEFAULT             3000   /* импульсов энкодера на оборот (PPR) */
 /* ========== Лимиты меню / EEPROM (общие для осей) ========== */
 #define AXIS_MOTOR_STEPS_MIN            200    /* мин. шагов двигателя на оборот */
