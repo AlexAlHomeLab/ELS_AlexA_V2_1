@@ -73,12 +73,12 @@
 #define BACKLASH_ENABLE_DEFAULT       1  /* 1 — BlEn вкл по умолчанию */
 /* Автовыборка при включении (EEPROM $40 / меню BlAu) */
 #define BACKLASH_AUTO_DEFAULT         0  /* 0 — BlAu выкл по умолчанию */
-#define BACKLASH_AUTO_SPEED_DEFAULT   50 /* макс. скорость выборки BlSp, мм/мин */
-#define BACKLASH_AUTO_SPEED_MIN       5  /* мин. допустимый BlSp, мм/мин */
-#define BACKLASH_AUTO_SPEED_MAX       200 /* макс. допустимый BlSp, мм/мин */
-#define BACKLASH_MIN_SPEED_DEFAULT    20 /* мин. скорость выборки BlMn, мм/мин */
-#define BACKLASH_MIN_SPEED_MIN        5  /* нижний предел BlMn в меню, мм/мин */
-#define BACKLASH_MIN_SPEED_MAX        200 /* верхний предел BlMn в меню, мм/мин */
+#define BACKLASH_AUTO_SPEED_DEFAULT   600 /* макс. скорость выборки BlSp, мм/мин */
+#define BACKLASH_AUTO_SPEED_MIN       50  /* мин. допустимый BlSp, мм/мин */
+#define BACKLASH_AUTO_SPEED_MAX       600 /* макс. допустимый BlSp, мм/мин */
+#define BACKLASH_MIN_SPEED_DEFAULT    50 /* мин. скорость выборки BlMn, мм/мин */
+#define BACKLASH_MIN_SPEED_MIN        50  /* нижний предел BlMn в меню, мм/мин */
+#define BACKLASH_MIN_SPEED_MAX        600 /* верхний предел BlMn в меню, мм/мин */
 
 /* --- Единицы отображения координат (EEPROM $44 / меню CrdU) --- */
 #define COORD_UNIT_STEPS              0  /* отображение в шагах */

@@ -78,7 +78,7 @@ INT2 (D18/D19) → hand_count (volatile)
        ↓
 motion_jog_poll (STATE_MANUAL only)
        ↓
-consume ticks → jog_steps_from_delta → mpg_cmd += steps
+consume ticks → mpg_adjust_tick_sign → jog_steps_from_delta → mpg_apply_tick → mpg_cmd
        ↓
 limits_clamp → planner_exec_jog(tx,tz, mpg_speed_mm_min(...), "MPG", cruise=1)
        ↓
@@ -117,13 +117,22 @@ if (st == STATE_MANUAL) {
 2. `hand_pos` при лимите — только фактические шаги
 3. Отдельные `mpg_accel` / `mpg_decel` (если скорости по режимам потребуют другой профиль)
 
+## Знак тика (motion_jog.cpp, static)
+
+| Функция | Где |
+|---------|-----|
+| `mpg_adjust_tick_sign` | Подача РГИ: poll, `mpg_dir_lock`, шаг в `jog_steps_from_delta` |
+| `sc_diameter_tick_sign` | Только `set_coord_apply_tick` при Xdia=D |
+| `set_coord_apply_tick` | D: `sc_pos -= tick*step`; иначе adjust (+ X invert для R): `sc_pos += tick*step` |
+| `set_coord_tick_steps(axis, frac)` | Шаг одного тика set-coord (мм/″/S; D → /2 для мм/″) |
+
 ## Set-coord (as-is)
 
-- API: `motion_jog_set_coord_active/axis/preview`, `ui_buttons_set_coord_id()`, `ui_buttons_set_coord_busy()`
-- Константа: `SC_COOLDOWN_MS` = 300; таймер сбрасывается при тиках во время cool
-- Release: только `!busy` (все L/R/U/D HIGH); не путать с `id==0` (дребезг)
-- Поток: any-busy gate → arm(id) → тики в `sc_pos` → release `!busy` → quiet cooldown → MPG
-- X: тик инвертирован в `set_coord_apply_tick`
+- API: `motion_jog_set_coord_preview`, `ui_buttons_set_coord_id()`, `ui_buttons_set_coord_busy()`
+- Кнопки: L/X целая, R/X дробная, **Up/Z дробная**, **Down/Z целая** (`frac`: id 2 или 3)
+- `SC_COOLDOWN_MS` = 300; release только `!busy`
+- Не использовать `sc_steps_to_val1000` / `sc_val1000_to_steps` в apply (legacy в файле, apply через step)
+- X D: `sc_diameter_tick_sign`; X R: adjust + invert X; Z: adjust
 
 ## Изоляция (кратко)
 
@@ -141,5 +150,5 @@ Serial (по умолчанию INFO — фронты без спама; VERBOSE
 - VERBOSE: `ticks`/`cmd`/`hand`, `coast`/`idle catch` (1× на фазу), `batch commit`, `defer`, `rev ign`
 - **Не** логировать `SC pos` каждый тик
 
-LCD строка 1: `MPG X +123` / `MPG Z -45` через `motion_jog_get_hand()`
-LCD строка 2–3: при set-coord — `sc_pos` через `motion_jog_set_coord_preview`
+LCD строка 2 (index 1): `MPG …` через `motion_jog_get_hand()`; X D — `lcd_x_steps_for_display` в `.ino`
+Строка 4: Z | X/D; set-coord — `sc_pos` через `motion_jog_set_coord_preview`

@@ -34,8 +34,8 @@ description: >-
 |-----------|-----|--------|
 | Left      | X   | целая |
 | Right     | X   | дробная |
-| Up        | Z   | целая |
-| Down      | Z   | дробная |
+| Up        | Z   | дробная |
+| Down      | Z   | целая |
 
 - Формат шага правки — как на LCD: CrdU (шаги / мм / дюймы); для X — ещё Xdia (радиус / диаметр).
 - Детект: raw Port F — `set_coord_id` (ровно одна) + `set_coord_busy` (любая); MPG блокируется при busy.
@@ -75,7 +75,7 @@ description: >-
 | 0 | `[Mode][----Feed----][Sub]` | `lcd_format_status_line`: mode слева, Feed по центру, Man/Ext/Int справа |
 | 1 | `MPG X +1234........M` | `lcd_format_mpg_line`; последний символ — `config_coord_unit_flag()` |
 | 2 | пустая | `ui_lcd_clear_line(2)` |
-| 3 | `R 12.345<Z -0.001>` | `lcd_format_coords_line` + `limits_lcd_marker`; буква X → R/D (Xdia) |
+| 3 | `Z ……` + `D/R ……` (сначала Z) | `lcd_format_coords_line`; X → R/D, Xdia=D: `-machine_steps` |
 
 При `planner_startup_busy()` (backlash takeup): строка 0 = `BL takeup...`, строка 1 = `Wait`, строка 3 = координаты.
 

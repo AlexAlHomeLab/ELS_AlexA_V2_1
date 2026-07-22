@@ -10,9 +10,9 @@
 #define AXIS_X_MOTOR_STEPS_DEFAULT      1500   /* полных шагов двигателя на оборот */
 #define AXIS_X_MICROSTEP_DEFAULT        1      /* делитель микрошага драйвера */
 #define AXIS_X_SCREW_PITCH_DEFAULT      100    /* шаг винта ×100: 1.00 мм */
-#define AXIS_X_MAX_SPEED_DEFAULT        130    /* макс. рабочая подача, мм/мин */
-#define AXIS_X_RAPID_SPEED_DEFAULT      130    /* rapid джойстика, мм/мин */
-#define AXIS_X_FEED_ACCEL_DEFAULT       3      /* уровень ускорения (×50 мм/с²) */
+#define AXIS_X_MAX_SPEED_DEFAULT        1200    /* макс. рабочая подача, мм/мин */
+#define AXIS_X_RAPID_SPEED_DEFAULT      1200    /* rapid джойстика, мм/мин */
+#define AXIS_X_FEED_ACCEL_DEFAULT       20      /* уровень ускорения (×50 мм/с²) */
 
 /* --- Заводские параметры оси Z --- */
 #define AXIS_Z_MOTOR_STEPS_DEFAULT      1920   /* полных шагов двигателя на оборот */
@@ -20,7 +20,7 @@
 #define AXIS_Z_SCREW_PITCH_DEFAULT      200    /* шаг винта ×100: 2.00 мм */
 #define AXIS_Z_MAX_SPEED_DEFAULT        1200   /* макс. рабочая подача, мм/мин */
 #define AXIS_Z_RAPID_SPEED_DEFAULT      1200   /* rapid джойстика, мм/мин */
-#define AXIS_Z_FEED_ACCEL_DEFAULT       10     /* уровень ускорения (×50 мм/с²) */
+#define AXIS_Z_FEED_ACCEL_DEFAULT       20     /* уровень ускорения (×50 мм/с²) */
 
 /* --- Шпиндель --- */
 #define SPINDLE_PPR_DEFAULT             3000   /* импульсов энкодера на оборот (PPR) */

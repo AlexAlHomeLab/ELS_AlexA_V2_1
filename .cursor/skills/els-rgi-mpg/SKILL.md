@@ -35,26 +35,69 @@ description: >-
 
 ## Установка координат кнопками дисплея + РГИ (ТЗ + as-is)
 
-На главном экране в `STATE_MANUAL` (меню закрыто): нажатие Left/Right (X целая/дробная) или Up/Down (Z целая/дробная) + вращение РГИ —
-правка отображаемой координаты **без хода**; отпускание — commit. Полное описание: skill `els-display-menu`.
+На главном экране в `STATE_MANUAL` (меню закрыто): удержание **одной** кнопки под LCD + РГИ —
+правка отображаемой координаты **без хода**; отпускание всех L/R/U/D — commit. LCD: skill `els-display-menu`.
+
+**Кнопки (as-is, `set_coord_poll`):**
+
+| btn_id | Кнопка | Ось | Часть |
+|--------|--------|-----|--------|
+| 1 | Left | X | целая (1.000 / 1000 шагов) |
+| 2 | Right | X | дробная (0.001 / 1 шаг) |
+| 3 | Up | Z | **дробная** |
+| 4 | Down | Z | **целая** |
+
+`frac = (btn_id == 2 || btn_id == 3) ? 1 : 0` — Right и Up = дробная.
 
 **As-is (реализовано):**
 
 | Пункт | Реализация |
 |-------|------------|
-| Детект кнопки | `ui_buttons_set_coord_id()` — ровно одна L/R/U/D; `set_coord_busy()` — любая нажата |
-| Вход / блок MPG | **любая** L/R/U/D (в т.ч. дребезг) → discard+halt, MPG не едет; arm при ровно одной |
-| Release | только когда **все** L/R/U/D отпущены (`!busy`); `id==0` при дребезге ≠ release |
-| Тики | только в `sc_pos` (превью); `hand_pos` / `mpg_cmd` / planner **не** двигают оси |
-| Шаг | CrdU: целая = 1.000 ед. LCD, дробная = 0.001; Xdia=D — половина машинных шагов; дробная через `val1000` (999+1 → .000 с переносом) |
-| Полярность X | в set-coord знак тика по X **инвертирован** относительно хода РГИ (`set_coord_apply_tick`) |
-| LCD | `motion_jog_set_coord_preview` → `lcd_format_coords_line`; dirty учитывает `sc_on`/`sc_pos` |
-| Commit | отпускание: `limits_rebase_axis`, `motion_set_pos_steps`, sync `mpg_cmd` |
-| Хвост MPG | после release/zero — cooldown: **тишина** энкодера `SC_COOLDOWN_MS` (300 мс); тики продлевают окно |
-| Блокировки | menu / MODE_OFF / go_lim / joy → `SC blk *`; вне `STATE_MANUAL` → `SC blk state` (FSM) |
-| Zero оси | `motion_jog_zero_axis`: halt + sync + тот же cooldown (антидёрганье) |
+| Детект | `ui_buttons_set_coord_id()` — ровно одна L/R/U/D; `ui_buttons_set_coord_busy()` — любая нажата |
+| Вход / блок MPG | любая L/R/U/D → discard+halt; arm при ровно одной |
+| Release | только когда **все** L/R/U/D отпущены (`!busy`) |
+| Тики | только `sc_pos`; planner / `mpg_cmd` при hold **не** крутят ось |
+| Шаг тика | `set_coord_tick_steps(axis, sc_frac)` — CrdU мм/″/шаги; Xdia=D — `step/2` для мм/″ |
+| Применение | `set_coord_apply_tick`: **не** через `val1000±1` (округление ломало уменьшение 0.001); всегда `± tick_sign * step` в машинных шагах |
+| X радиус | `mpg_adjust_tick_sign` + инверсия X → `sc_pos += tick * step` |
+| X диаметр | `sc_diameter_tick_sign` → `sc_pos -= tick * step` (крутим + → D на LCD растёт) |
+| Z | `mpg_adjust_tick_sign` (Z invert compile-time) → `sc_pos += tick * step` |
+| LCD | `motion_jog_set_coord_preview` → строка 4; X D через `lcd_x_steps_for_display` в `.ino` |
+| Commit | `limits_rebase_axis`, `motion_set_pos_steps`, sync `mpg_cmd` |
+| Cooldown | `SC_COOLDOWN_MS` (300 мс), продлевается при тиках энкодера |
+| Блокировки | menu / MODE_OFF / go_lim / joy / не MANUAL |
 
 Отладка INFO: `SC press/release/arm/tick/commit/cool`/`cool end`, `SC blk *`. Не спамить `SC pos` каждый тик.
+
+## As-is: полярность РГИ (подача vs set-coord)
+
+Две разные цепочки знака — **не объединять** в одну инверсию диаметра на `mpg_dir_lock`.
+
+### `mpg_adjust_tick_sign(axis, raw ±1)`
+
+- X: компенсация `config_get_dir_invert(AXIS_X)`.
+- Z: опционально `MPG_AXIS_Z_INVERT` (compile-time).
+- **Подача РГИ** (ход суппорта): в poll только эта функция → `jog_steps_from_delta` → `mpg_apply_tick` → `mpg_cmd`.
+- `mpg_dir_lock` и реверс N=3 используют **тот же** знак, что и шаг подачи.
+
+### `sc_diameter_tick_sign(axis, raw ±1)` — только set-coord, Xdia=D
+
+- `mpg_adjust_tick_sign` + **доп.** инверсия для `X_COORD_MODE_DIAMETER`.
+- Set-coord по D **не** совпадает по знаку с подачей РГИ на X: на LCD правим «номер D», подача — машинные шаги (как джойстик: вперёд → D на LCD уменьшается).
+
+### Отображение Xdia=D (`.ino`, не motion)
+
+- `lcd_x_steps_for_display`: машинные шаги → **−steps** на LCD и в строке `MPG D` (`hand_pos` тоже через минус).
+- Джойстик вперёд увеличивает машинный X → D на экране **уменьшается** (инверсия только отображения + согласованный шаг мм в `jog_steps_from_delta`).
+
+### Сводка знака (X, Xdia=D)
+
+| Режим | Функция знака | Обновление позиции |
+|-------|----------------|-------------------|
+| РГИ подача | `mpg_adjust_tick_sign` | `mpg_cmd` += steps |
+| Set-coord D | `sc_diameter_tick_sign` | `sc_pos -= tick * step` |
+| Set-coord R (X) | adjust + invert X | `sc_pos += tick * step` |
+| Set-coord Z | adjust (+ Z invert) | `sc_pos += tick * step` |
 ## Быстрый старт для агента
 
 1. Прочитай [reference.md](reference.md) — карта файлов и API.
@@ -69,11 +112,11 @@ description: >-
 | ISR | `ui_encoder.cpp`, `hal_interrupts.cpp` | Счётчик `hand_count`, INT2 |
 | UI | `ui_switches.cpp` | `mpg_axis` (X/Z), `mpg_scale` (1:1 / 0.01 мм) |
 | UI | `ui_buttons.cpp` | `ui_buttons_set_coord_id()` — raw Port F для set-coord |
-| Логика | `motion_jog.cpp` | `motion_jog_poll()`, `hand_pos[]`, `mpg_cmd[]`, set-coord (`sc_*`) |
+| Логика | `motion_jog.cpp` | `mpg_adjust_tick_sign`, `sc_diameter_tick_sign`, `set_coord_apply_tick`, poll |
 | Движение | `planner.cpp` | `planner_exec_jog(..., "MPG", cruise=1)` |
 | FSM | `fsm_manager.cpp` | РГИ/set-coord только при `STATE_MANUAL` |
 | Конфиг | `config_mpg.h` | `MPG_RAPID_MODE`, скорости РГИ по режимам |
-| LCD | `ELS_AlexA_V2.1.ino` | строка MPG, coords + превью set-coord, маркер `>` при Rapid |
+| LCD | `ELS_AlexA_V2.1.ino` | строка MPG, coords (Z|D), `lcd_x_steps_for_display`, превью set-coord |
 
 ## Масштаб импульса
 
@@ -204,7 +247,9 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 - [ ] hand_pos сброс только при старте джойстика по оси
 - [ ] Антидребезг: consume по 1 тику; reverse ≤N игнор, >N полный стоп
 - [x] Отдельные скорости РГИ: `MPG_SPEED_*` в config_mpg.h, `mpg_speed_mm_min()`
-- [x] Set-coord: L/R/U/D + РГИ без хода; X invert; frac wrap; release только `!busy`; quiet cooldown 300 мс
+- [x] Set-coord: Up/Down Z (Up дробная); шаг через `set_coord_tick_steps`; D — `sc_diameter_tick_sign`; не val1000±1
+- [x] Подача РГИ X D: знак только `mpg_adjust_tick_sign`; dir_lock = знак подачи
+- [x] LCD D: `-machine_steps`; строка 4: Z затем X/D
 - [ ] Минимальный diff, одна зона за раз
 - [ ] Производительность ISR: без тяжёлой логики в прерывании
 ```
@@ -224,6 +269,9 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 11. **Фиксированный cooldown без тишины** — хвост тиков после окна стартует `MPG run`; продлевать, пока `peek!=0`.
 12. **VERBOSE `SC pos` каждый тик** — спам Serial; только INFO на `arm`/`tick`(первый)/`commit`.
 13. **LCD dirty без `sc_pos`** — превью set-coord не обновляется на экране.
+14. **Инверсия D в `mpg_adjust_tick_sign` для подачи** — ломает `mpg_dir_lock` vs реальный шаг; D только в `sc_diameter_tick_sign` (set-coord) и на LCD.
+15. **Set-coord дробная через val1000±1** — `sc_val1000_to_steps` часто не меняет `sc_pos` на ±0.001; только `set_coord_tick_steps`.
+16. **Две инверсии dir_invert и D в одном tick_sign для подачи** — взаимно гасятся; подача без инверсии D, set-coord D — с `sc_diameter_tick_sign`.
 ## Дополнительно
 
 - Пины и прерывания: [reference.md](reference.md)
