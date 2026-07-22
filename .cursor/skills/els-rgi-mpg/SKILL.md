@@ -184,7 +184,9 @@ Compile-time: `MPG_RAPID_MODE` (по умолчанию `MPG_RAPID_MODE_APPROACH
 
 ### Конфликт с джойстиком
 
-- Если джойстик держит ось, выбранную на селекторе РГИ — РГИ блокируется (`blk joy`).
+- Любое удержание joy (X и/или Z) — РГИ блокируется (`blk joy`), coast/idle не идёт.
+- Старт joy на оси → `joy_mpg_isolate_peer`: sync `mpg_cmd`/target на peer-оси.
+- `jog_peer_axis_hold`: при joy ось без джойстика → `position`.
 - См. инварианты изоляции выше; не дублировать логику joy внутри MPG-пути.
 
 ## Чеклист при правках
