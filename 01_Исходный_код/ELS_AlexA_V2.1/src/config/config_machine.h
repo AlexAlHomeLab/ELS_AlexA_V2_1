@@ -14,7 +14,7 @@
 /* Скорости и ускорение (EEPROM) */
 #define AXIS_X_MAX_SPEED_DEFAULT        1200   /* макс. рабочая подача, мм/мин */
 #define AXIS_X_RAPID_SPEED_DEFAULT      1200   /* rapid джойстика, мм/мин */
-#define AXIS_X_FEED_ACCEL_DEFAULT       20     /* уровень ускорения (×50 мм/с²) */
+#define AXIS_X_FEED_ACCEL_DEFAULT       2     /* уровень ускорения (×50 мм/с²) */
 /* Направление STEP / джойстик (EEPROM) */
 #ifndef AXIS_X_DIR_INVERT_DEFAULT
 #define AXIS_X_DIR_INVERT_DEFAULT       1      /* 1 — реверс DIR оси X */
@@ -37,7 +37,7 @@
 /* Скорости и ускорение (EEPROM) */
 #define AXIS_Z_MAX_SPEED_DEFAULT        1200   /* макс. рабочая подача, мм/мин */
 #define AXIS_Z_RAPID_SPEED_DEFAULT      1200   /* rapid джойстика, мм/мин */
-#define AXIS_Z_FEED_ACCEL_DEFAULT       20     /* уровень ускорения (×50 мм/с²) */
+#define AXIS_Z_FEED_ACCEL_DEFAULT       10     /* уровень ускорения (×50 мм/с²) */
 /* Направление STEP / джойстик (EEPROM) */
 #ifndef AXIS_Z_DIR_INVERT_DEFAULT
 #define AXIS_Z_DIR_INVERT_DEFAULT       0      /* 0 — DIR Z без инверсии */
