@@ -146,6 +146,15 @@ static int8_t mpg_adjust_tick_sign(uint8_t axis, int8_t tick_sign) {
     return tick_sign;
 }
 
+/* Set-coord Xdia=D: знак тика РГИ (крутим + → D на LCD растёт). */
+static int8_t sc_diameter_tick_sign(uint8_t axis, int8_t tick_sign) {
+    tick_sign = mpg_adjust_tick_sign(axis, tick_sign);
+    if (axis == AXIS_X && config_get_x_coord_mode() == X_COORD_MODE_DIAMETER) {
+        tick_sign = (int8_t)(-tick_sign);
+    }
+    return tick_sign;
+}
+
 static int32_t jog_steps_from_delta(uint8_t axis, int32_t delta, uint8_t mpg_scale, uint8_t rapid) {
     int32_t spm;
     int32_t step;
@@ -443,31 +452,24 @@ static void sc_mpg_gate(void) {
     mpg_sync_cmd();
 }
 
-/* Один тик set-coord: X — инверсия знака; дробная мм/″ — через val1000 (999→000 с переносом) */
+/* Один тик set-coord: X — инверсия знака; мм/″ — шаг set_coord_tick_steps (не val1000±1). */
 static void set_coord_apply_tick(int8_t tick_sign) {
-    uint8_t units = config_get_coord_units();
     int32_t step;
-    int32_t v;
+
+    if (sc_axis == AXIS_X && config_get_x_coord_mode() == X_COORD_MODE_DIAMETER) {
+        tick_sign = sc_diameter_tick_sign(sc_axis, tick_sign);
+        step = set_coord_tick_steps(sc_axis, sc_frac);
+        sc_pos -= (int32_t)tick_sign * step;
+        return;
+    }
 
     tick_sign = mpg_adjust_tick_sign(sc_axis, tick_sign);
-    /* Полярность X в set-coord: наоборот относительно хода РГИ */
     if (sc_axis == AXIS_X) {
         tick_sign = (int8_t)(-tick_sign);
     }
 
-    if (units == COORD_UNIT_STEPS) {
-        step = set_coord_tick_steps(sc_axis, sc_frac);
-        sc_pos += (int32_t)tick_sign * step;
-        return;
-    }
-
-    v = sc_steps_to_val1000(sc_axis, sc_pos);
-    if (sc_frac) {
-        v += (int32_t)tick_sign;           /* 0.001; 999+1 → 1000 ≡ .000 +1 целая */
-    } else {
-        v += (int32_t)tick_sign * 1000L; /* 1.000 */
-    }
-    sc_pos = sc_val1000_to_steps(sc_axis, v);
+    step = set_coord_tick_steps(sc_axis, sc_frac);
+    sc_pos += (int32_t)tick_sign * step;
 }
 
 /* Commit превью: смена отображаемой координаты без хода + rebase лимитов */
@@ -501,7 +503,7 @@ static void set_coord_clear(uint8_t discard_ticks) {
 
 /*
  * Hold Left/Right (X) или Up/Down (Z) + РГИ: правка превью без хода.
- * btn_id: 1=L 2=R 3=U 4=D (из ui_buttons_set_coord_id); 0 — отпускание.
+ * btn_id: 1=L 2=R 3=U 4=D; Z: U=дробная, D=целая (X: L/R).
  * Возвращает 1 — тики РГИ заняты set-coord (jog не трогать).
  */
 static uint8_t set_coord_poll(uint8_t btn_id) {
@@ -532,7 +534,8 @@ static uint8_t set_coord_poll(uint8_t btn_id) {
     }
 
     axis = (btn_id <= 2U) ? AXIS_X : AXIS_Z;
-    frac = (btn_id == 2U || btn_id == 4U) ? 1U : 0U;
+    /* X: L целая, R дробная; Z: Down целая, Up дробная */
+    frac = (btn_id == 2U || btn_id == 3U) ? 1U : 0U;
 
     /* Joy/go_lim — нельзя править координату */
     if (go_lim_active || joy_z_on || joy_x_on) {

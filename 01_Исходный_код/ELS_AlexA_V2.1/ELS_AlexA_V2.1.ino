@@ -192,8 +192,19 @@ static void lcd_steps_to_parts(int32_t steps, uint8_t axis, uint8_t units, uint8
     *frac = val1000 % 1000UL;
 }
 
+/* Xdia=диаметр: на LCD знак против машинных шагов (вперёд → D уменьшается). */
+static int32_t lcd_x_steps_for_display(int32_t machine_steps) {
+    if (config_get_x_coord_mode() == X_COORD_MODE_DIAMETER) {
+        return -machine_steps;
+    }
+    return machine_steps;
+}
+
 /* Поле оси 10 символов. X: буква R/D; в Xdia=диаметр мм/дюйм ×2. */
 static void lcd_format_axis_field(char *dst, uint8_t axis_id, int32_t steps, char mark) {
+    if (axis_id == AXIS_X) {
+        steps = lcd_x_steps_for_display(steps);
+    }
     uint8_t units = config_get_coord_units();
     char letter = (axis_id == AXIS_X) ? config_x_coord_axis_char() : 'Z';
     uint8_t scale2 = (axis_id == AXIS_X &&
@@ -240,6 +251,10 @@ static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_
     char num[8];
     uint8_t num_col;
 
+    if (axis_id == AXIS_X) {
+        hand = lcd_x_steps_for_display(hand);
+    }
+
     memset(lcd_mpg, ' ', LCD_COLS);
     if (joy_rapid) {
         memcpy(lcd_mpg, "MPG", 3);
@@ -277,7 +292,7 @@ static void lcd_format_mpg_line(char axis, int32_t hand, uint8_t axis_id, uint8_
     lcd_mpg[LCD_COLS] = 0;
 }
 
-/* Строка 4 LCD: X/Z по 10 символов, хвост пробелами — без \0 внутри 20 байт.
+/* Строка 4 LCD: Z и X (R/D) по 10 символов, сначала Z — без \0 внутри 20 байт.
  * При set-coord (hold L/R/U/D+РГИ) — превью оси без физического хода. */
 static void lcd_format_coords_line(char *buf, size_t len) {
     int32_t xs = motion_get_pos_steps(AXIS_X);
@@ -298,8 +313,8 @@ static void lcd_format_coords_line(char *buf, size_t len) {
         return;
     }
     memset(buf, ' ', LCD_COLS);
-    memcpy(buf, lcd_xf, 10);
-    memcpy(buf + 10, lcd_zf, 10);
+    memcpy(buf, lcd_zf, 10);
+    memcpy(buf + 10, lcd_xf, 10);
     buf[LCD_COLS] = 0;
 }
 
