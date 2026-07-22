@@ -20,18 +20,18 @@
 #define AXIS_X_DIR_INVERT_DEFAULT       1      /* 1 — реверс DIR оси X */
 #endif
 /* Люфт: заводские шаги / сотые мм (EEPROM BlX; рантайм config_backlash) */
-#define BACKLASH_X_STEPS_DEFAULT        565   /* ~0.03 мм при 100 шаг/мм */
+#define BACKLASH_X_STEPS_DEFAULT        520   /* ~0.03 мм при 100 шаг/мм */
 #define BACKLASH_X_CENTIMM              34     /* запас при steps=0, сотые мм */
 #define BACKLASH_REF_DIR_X              BACKLASH_DIR_NEG  /* стартовая выборка */
 /* РГИ, мм/мин (прошивка; clamp к max_speed оси) */
-#define MPG_SPEED_X1_X_MM_MIN           30     /* 1 шаг/тик */
-#define MPG_SPEED_001_X_MM_MIN          30     /* 0.01 мм/тик */
+#define MPG_SPEED_X1_X_MM_MIN           12     /* 1 шаг/тик */
+#define MPG_SPEED_001_X_MM_MIN          20     /* 0.01 мм/тик */
 #define MPG_SPEED_01_LIVE_X_MM_MIN      30     /* Rapid 0.1 мм/тик, LIVE */
 #define MPG_SPEED_APPROACH_X_MM_MIN     100    /* подвод Rapid (APPROACH) */
 
 /* ========== Ось Z ========== */
 /* Кинематика (EEPROM) */
-#define AXIS_Z_MOTOR_STEPS_DEFAULT      1920   /* полных шагов двигателя на оборот */
+#define AXIS_Z_MOTOR_STEPS_DEFAULT      2000   /* полных шагов двигателя на оборот */
 #define AXIS_Z_MICROSTEP_DEFAULT        1      /* делитель микрошага драйвера */
 #define AXIS_Z_SCREW_PITCH_DEFAULT      200    /* шаг винта ×100: 2.00 мм */
 /* Скорости и ускорение (EEPROM) */
@@ -43,15 +43,15 @@
 #define AXIS_Z_DIR_INVERT_DEFAULT       0      /* 0 — DIR Z без инверсии */
 #endif
 /* Люфт (EEPROM BlZ) */
-#define BACKLASH_Z_STEPS_DEFAULT        480    /* ~0.08 мм при 100 шаг/мм */
+#define BACKLASH_Z_STEPS_DEFAULT        521    /* ~0.08 мм при 100 шаг/мм */
 #define BACKLASH_Z_CENTIMM              46     /* запас при steps=0, сотые мм */
 #define BACKLASH_REF_DIR_Z              BACKLASH_DIR_NEG
 /* РГИ: полярность тиков (mpg_adjust_tick_sign); скорости мм/мин */
 #ifndef MPG_AXIS_Z_INVERT
 #define MPG_AXIS_Z_INVERT               1      /* 1 — вправо +Z, влево −Z */
 #endif
-#define MPG_SPEED_X1_Z_MM_MIN           400
-#define MPG_SPEED_001_Z_MM_MIN          400
+#define MPG_SPEED_X1_Z_MM_MIN           200
+#define MPG_SPEED_001_Z_MM_MIN          200
 #define MPG_SPEED_01_LIVE_Z_MM_MIN      400
 #define MPG_SPEED_APPROACH_Z_MM_MIN     200
 
