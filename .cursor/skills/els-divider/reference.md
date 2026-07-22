@@ -60,7 +60,8 @@ Legacy (не использовать в новой логике): `mode_divider
 ## Формулы
 
 ```c
-#define DIVIDER_TICKS_PER_REV  ((int32_t)SPINDLE_ENCODER_PPR * 2)
+/* Rising на канале B: тиков/об = PPR (меню Spdl), без ×2 квадратуры */
+#define DIVIDER_TICKS_PER_REV  ((int32_t)SPINDLE_ENCODER_PPR)
 
 static int32_t div_count_rel(void) {
     return spindle_get_count() - div_zero_count;

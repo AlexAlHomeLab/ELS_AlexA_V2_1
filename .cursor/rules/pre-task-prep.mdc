@@ -25,7 +25,7 @@ alwaysApply: true
 | Лимиты LimL/F/R/Re, go_lim, clamp | `els-limits` |
 | Люфт, backlash, BlX/BlZ, rem_x/rem_z | `els-backlash` |
 | Профиль движения, разгон/торможение, виды дистанций | `els-motion-types` |
-| Делительная головка, divider, деление окружности | `els-divider` |
+| Делительная головка, divider, энкодер шпинделя, INT0/PPR | `els-divider` |
 | Подхват резьбы, COU как ΔZ, виртуальная гайка | `els-divider-thread-align` |
 | Селектор режимов, MODE_OFF, CNC OFF, EN_X soft-latch | `els-mode-selector` |
 | История изменений функционала, CHANGELOG | `els-changelog` |

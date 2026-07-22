@@ -12,9 +12,12 @@ static void mpg_interrupts_init(void) {
     EIMSK |= (1 << INT2);
 }
 
+/* INT0 (D21 / канал B): только Rising — ×1 к PPR, вдвое меньше ISR чем Any Change.
+ * ISC01:ISC00 = 11; биты сбрасываем явно, чтобы не осталось Low/Change. */
 void encoder_interrupts_init(void) {
 #if ENABLE_SPINDLE_ENCODER
-    EICRA |= (1 << ISC00);
+    EICRA = (uint8_t)((EICRA & (uint8_t)~((1 << ISC01) | (1 << ISC00)))
+                      | (1 << ISC01) | (1 << ISC00));
     EIFR = (1 << INTF0);
     EIMSK |= (1 << INT0);
 #endif

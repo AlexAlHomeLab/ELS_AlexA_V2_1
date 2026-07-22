@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-/* INT0 — шпиндель; INT2 — РГИ */
+/* INT0 — шпиндель (Rising на B/D21, ×1 к PPR); INT2 — РГИ */
 void encoder_interrupts_init(void);
 void mpg_int_enable(void);
 void mpg_int_disable(void);

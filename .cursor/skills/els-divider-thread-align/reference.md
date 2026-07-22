@@ -12,7 +12,8 @@
 ## Формулы
 
 ```c
-#define TICKS_PER_REV  ((int32_t)SPINDLE_ENCODER_PPR * 2)
+/* Согласовано с INT0 Rising на B (×1 к PPR), как mode_divider */
+#define TICKS_PER_REV  ((int32_t)SPINDLE_ENCODER_PPR)
 
 /* Опорная точка (после Select / latch) */
 int32_t C_ref;   /* spindle_get_count() */

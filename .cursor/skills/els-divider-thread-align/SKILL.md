@@ -3,8 +3,9 @@ name: els-divider-thread-align
 description: >-
   Перспектива ELS AlexA V2.1: подхват резьбы через делительную головку — отслеживание
   шпинделя и Z, дельта корректировки Z в строке COU при активации нарезания резьбы.
-  Используй при проектировании mode_thread, расширения mode_divider, COU/Z sync;
-  когда упоминают подхват резьбы, виртуальную гайку, ΔZ, стыковку шага, COU как дельту Z.
+  TICKS_PER_REV = SPINDLE_ENCODER_PPR (×1, Rising INT0). Используй при проектировании
+  mode_thread, расширения mode_divider, COU/Z sync; когда упоминают подхват резьбы,
+  виртуальную гайку, ΔZ, стыковку шага, COU как дельту Z.
 ---
 
 # Подхват резьбы через Divider — COU как ΔZ (перспектива)
@@ -57,7 +58,7 @@ P     — шаг резьбы, мм/об (из mode_thread / меню)
 В любой момент:
 
 ```
-TICKS_PER_REV = SPINDLE_ENCODER_PPR * 2
+TICKS_PER_REV = SPINDLE_ENCODER_PPR   /* INT0 Rising на B: ×1 к PPR; см. els-divider */
 C             = spindle_get_count()
 Z             = motion_get_pos_steps(AXIS_Z)
 
@@ -72,6 +73,7 @@ Z_target_mm   = Z_ref_mm + (C - C_ref) * P / TICKS_PER_REV
 ```
 
 где `P_steps_per_rev = P_mm * STEPS_PER_MM_Z`.
+Не использовать `PPR * 2` — устарело после смены Any Change → Rising.
 
 **ΔZ = 0** — ось Z согласована с шпинделем и шагом P; можно включать sync.
 
