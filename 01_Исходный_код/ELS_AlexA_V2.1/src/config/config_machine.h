@@ -12,15 +12,15 @@
 #define AXIS_X_MICROSTEP_DEFAULT        1      /* делитель микрошага драйвера */
 #define AXIS_X_SCREW_PITCH_DEFAULT      100    /* шаг винта ×100: 1.00 мм */
 /* Скорости и ускорение (EEPROM) */
-#define AXIS_X_MAX_SPEED_DEFAULT        1200   /* макс. рабочая подача, мм/мин */
-#define AXIS_X_RAPID_SPEED_DEFAULT      1200   /* rapid джойстика, мм/мин */
+#define AXIS_X_MAX_SPEED_DEFAULT        120   /* макс. рабочая подача, мм/мин */
+#define AXIS_X_RAPID_SPEED_DEFAULT      130   /* rapid джойстика, мм/мин */
 #define AXIS_X_FEED_ACCEL_DEFAULT       2     /* уровень ускорения (×50 мм/с²) */
 /* Направление STEP / джойстик (EEPROM) */
 #ifndef AXIS_X_DIR_INVERT_DEFAULT
 #define AXIS_X_DIR_INVERT_DEFAULT       1      /* 1 — реверс DIR оси X */
 #endif
 /* Люфт: заводские шаги / сотые мм (EEPROM BlX; рантайм config_backlash) */
-#define BACKLASH_X_STEPS_DEFAULT        1130   /* ~0.03 мм при 100 шаг/мм */
+#define BACKLASH_X_STEPS_DEFAULT        565   /* ~0.03 мм при 100 шаг/мм */
 #define BACKLASH_X_CENTIMM              34     /* запас при steps=0, сотые мм */
 #define BACKLASH_REF_DIR_X              BACKLASH_DIR_NEG  /* стартовая выборка */
 /* РГИ, мм/мин (прошивка; clamp к max_speed оси) */
@@ -36,14 +36,14 @@
 #define AXIS_Z_SCREW_PITCH_DEFAULT      200    /* шаг винта ×100: 2.00 мм */
 /* Скорости и ускорение (EEPROM) */
 #define AXIS_Z_MAX_SPEED_DEFAULT        1200   /* макс. рабочая подача, мм/мин */
-#define AXIS_Z_RAPID_SPEED_DEFAULT      1200   /* rapid джойстика, мм/мин */
+#define AXIS_Z_RAPID_SPEED_DEFAULT      1300   /* rapid джойстика, мм/мин */
 #define AXIS_Z_FEED_ACCEL_DEFAULT       10     /* уровень ускорения (×50 мм/с²) */
 /* Направление STEP / джойстик (EEPROM) */
 #ifndef AXIS_Z_DIR_INVERT_DEFAULT
 #define AXIS_Z_DIR_INVERT_DEFAULT       0      /* 0 — DIR Z без инверсии */
 #endif
 /* Люфт (EEPROM BlZ) */
-#define BACKLASH_Z_STEPS_DEFAULT        625    /* ~0.08 мм при 100 шаг/мм */
+#define BACKLASH_Z_STEPS_DEFAULT        480    /* ~0.08 мм при 100 шаг/мм */
 #define BACKLASH_Z_CENTIMM              46     /* запас при steps=0, сотые мм */
 #define BACKLASH_REF_DIR_Z              BACKLASH_DIR_NEG
 /* РГИ: полярность тиков (mpg_adjust_tick_sign); скорости мм/мин */
