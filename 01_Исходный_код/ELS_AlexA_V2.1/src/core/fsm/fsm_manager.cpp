@@ -7,6 +7,7 @@
 #include "../motion/planner.h"
 #include "../process/estop_control.h"
 #include "../ui/ui_buttons.h"
+#include "../ui/ui_lcd.h"
 #include "../ui/ui_menu.h"
 #include "../ui/ui_switches.h"
 #include "../../config/config.h"
@@ -34,6 +35,8 @@ void fsm_manager_set_mode(uint8_t mode) {
     current_mode = mode;
     fsm_set_mode(current_mode);
     fsm_manager_enter_mode(current_mode);
+    /* Полная перерисовка LCD — восстановление после сбоя во время движения/ISR */
+    ui_lcd_request_hard_redraw();
     DBG_INFO_VAL("FSM", "MODE", "idx", current_mode);
 }
 

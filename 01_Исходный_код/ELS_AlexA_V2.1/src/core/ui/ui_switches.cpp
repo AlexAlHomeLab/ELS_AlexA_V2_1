@@ -1,4 +1,5 @@
 #include "ui_switches.h"
+#include "ui_lcd.h"
 #include "ui_io.h"
 #include "../motion/motion_jog.h"
 #include "../motion/motor_en.h"
@@ -203,10 +204,12 @@ void ui_switches_poll(void) {
         }
         last_mode_off = mode_off;
         last_mode = mode;
+        ui_lcd_request_hard_redraw(); /* OFF↔режим: полный re-init LCD */
     } else if (!mode_off && mode != last_mode) {
         DBG_INFO_VAL("UI", "MODE", ui_switches_get_mode_name(mode), mode);
         ui_buzzer_mode_beep();
         last_mode = mode;
+        ui_lcd_request_hard_redraw(); /* селектор режима — на случай если FSM не сменил idx */
     }
     if (sub != last_submode) {
         const char *sub_name = "Man";

@@ -20,12 +20,12 @@
 #define LCD_D6_PIN 12          /* шина данных LCD, бит D6 */
 #define LCD_D5_PIN 11          /* шина данных LCD, бит D5 */
 #define LCD_D4_PIN 10          /* шина данных LCD, бит D4 */
-#define LCD_D3_PIN 41          /* шина данных LCD, бит D3 (только 8-бит режим) */
-#define LCD_D2_PIN 40          /* шина данных LCD, бит D2 (только 8-бит режим) */
-#define LCD_D1_PIN 39          /* шина данных LCD, бит D1 (только 8-бит режим) */
-#define LCD_D0_PIN 38          /* шина данных LCD, бит D0 (только 8-бит режим) */
+#define LCD_D3_PIN 53 //41     /* шина данных LCD, бит D3 (только 8-бит режим) */
+#define LCD_D2_PIN 52 //40     /* шина данных LCD, бит D2 (только 8-бит режим) */
+#define LCD_D1_PIN 51 //39     /* шина данных LCD, бит D1 (только 8-бит режим) */
+#define LCD_D0_PIN 50 //38     /* шина данных LCD, бит D0 (только 8-бит режим) */
 #define LCD_EN_PIN 9           /* Enable LCD (строб записи/чтения) */
-#define LCD_RW_PIN 47          /* R/W LCD: 0=запись, 1=чтение */
+#define LCD_RW_PIN 5 //47      /* R/W LCD: 0=запись, 1=чтение */
 #define LCD_RS_PIN 8           /* Register Select: 0=команда, 1=данные */
 
 /* --- Бипер (PH1 D16, активный LOW — покой HIGH, см. hal_buzzer) --- */
@@ -131,7 +131,7 @@
 #define LIMIT_UP_PIN    LIMIT_FRONT_PIN          /* алиас: лимит «вверх» по X = Front */
 #define LIMIT_DOWN_PIN  LIMIT_REAR_PIN           /* алиас: лимит «вниз» по X = Rear */
 
-#define ESTOP_BTN_PIN     5 /* авария E-stop (активный LOW); было 40 — занят LCD_D2 в 8-бит */
+#define ESTOP_BTN_PIN     38 /* авария E-stop (активный LOW);*/
 #define SPINDLE_PWM_PIN   6  /* ШИМ оборотов шпинделя (OC4A / Timer4) */
 #define COOLANT_PIN       17 /* реле/выход СОЖ (охлаждение) */
 

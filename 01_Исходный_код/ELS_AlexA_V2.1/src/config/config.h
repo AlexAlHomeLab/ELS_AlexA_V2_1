@@ -21,7 +21,7 @@
 #define LCD_UPDATE_MS 80                  /* период обновления дисплея, мс */
 #define POT_READ_MS 100                  /* период опроса потенциометра подачи, мс */
 
-#define DEBUG_ENABLED 0                  /* 1 — включить DBG_* вывод в Serial */
+#define DEBUG_ENABLED 1                  /* 1 — включить DBG_* вывод в Serial */
 
 #define DEBUG_LEVEL_ERROR   0            /* только ошибки */
 #define DEBUG_LEVEL_WARNING 1            /* + предупреждения */

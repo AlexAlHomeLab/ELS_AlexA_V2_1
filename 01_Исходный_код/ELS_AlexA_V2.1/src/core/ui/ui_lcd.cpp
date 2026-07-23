@@ -3,6 +3,7 @@
 #include "ui_lcd.h"
 
 #include <Arduino.h>
+#include <avr/interrupt.h>
 #include <string.h>
 
 #if !defined(LCD_DISABLE_TX)
@@ -29,6 +30,7 @@ static LiquidCrystal lcd(LCD_RS_PIN, LCD_EN_PIN,
 static char lcd_buffer[LCD_ROWS][LCD_COLS + 1];
 static uint8_t lcd_cursor_line = 0xFF;
 static uint8_t lcd_cursor_col = 0;
+static uint8_t lcd_hard_redraw_req = 0; /* 1 — loop должен вызвать ui_lcd_hard_redraw */
 
 #if !defined(LCD_DISABLE_TX) && defined(USE_LCD_SAFE_ASYNC) && (LCD_SYNC_INTERVAL_MS > 0)
 static unsigned long lcd_last_sync_ms = 0;
@@ -59,6 +61,46 @@ void ui_lcd_flush(void) {
 #endif
 }
 
+/* Запросить hard redraw из FSM/режимов; фактический вывод — в loop. */
+void ui_lcd_request_hard_redraw(void) {
+    lcd_hard_redraw_req = 1;
+}
+
+/* Забрать и сбросить флаг hard redraw (для loop). */
+uint8_t ui_lcd_take_hard_redraw(void) {
+    uint8_t v = lcd_hard_redraw_req;
+    lcd_hard_redraw_req = 0;
+    return v;
+}
+
+/* Восстановление экрана: clear + lcd_buffer → HD44780 под cli.
+ * Без lcd.begin() — его ~50 мс delay выглядят как «замедленное кино».
+ * Буфер не стирает. */
+void ui_lcd_hard_redraw(void) {
+#if defined(LCD_DISABLE_TX)
+    return;
+#else
+    uint8_t sreg = SREG;
+    cli();
+    lcd.clear();
+    lcd.noCursor();
+    for (uint8_t row = 0; row < LCD_ROWS; row++) {
+        lcd.setCursor(0, row);
+        for (uint8_t col = 0; col < LCD_COLS; col++) {
+            lcd.write((uint8_t)lcd_buffer[row][col]);
+        }
+    }
+    if (lcd_cursor_line < LCD_ROWS) {
+        lcd.setCursor(lcd_cursor_col, lcd_cursor_line);
+        lcd.cursor();
+    }
+    SREG = sreg;
+#if defined(USE_LCD_SAFE_ASYNC)
+    lcd.flush();
+#endif
+#endif /* LCD_DISABLE_TX */
+}
+
 void ui_lcd_init(void) {
 #if !defined(LCD_DISABLE_TX)
 #if defined(USE_LCD_SAFE_ASYNC)
@@ -77,7 +119,8 @@ void ui_lcd_init(void) {
     }
 }
 
-/* STANDARD: синхронный вывод. SafeAsync: только enqueue — drain в ui_lcd_process_queue(). */
+/* STANDARD: синхронный вывод. SafeAsync: только enqueue — drain в ui_lcd_process_queue().
+ * Без cli на полный кадр: иначе Timer1 STEP стоит → рывки при jog (координаты dirty каждые LCD_UPDATE_MS). */
 void ui_lcd_update(void) {
 #if defined(LCD_DISABLE_TX)
     return;
@@ -134,11 +177,14 @@ void ui_lcd_clear_line(uint8_t line) {
 
 void ui_lcd_clear(void) {
 #if !defined(LCD_DISABLE_TX)
+    uint8_t sreg = SREG;
+    cli();
     lcd.clear();
+    lcd.noCursor();
+    SREG = sreg;
 #if defined(USE_LCD_SAFE_ASYNC)
     lcd_drain_queue(LCD_FLUSH_US_BUDGET);
 #endif
-    lcd.noCursor();
 #endif
     lcd_cursor_line = 0xFF;
     for (uint8_t i = 0; i < LCD_ROWS; i++) {

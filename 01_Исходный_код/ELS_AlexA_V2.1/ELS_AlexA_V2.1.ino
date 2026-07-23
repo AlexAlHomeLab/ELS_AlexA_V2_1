@@ -561,8 +561,7 @@ void setup() {
     fsm_manager_init();
     SETUP_MARK("spd");
     spindle_init();
-    SETUP_MARK("isr");
-    encoder_interrupts_init();
+    /* encoder_interrupts_init — после первого кадра LCD и timer1 (см. конец setup) */
 
     SETUP_MARK("draw");
     update_lcd();
@@ -573,6 +572,10 @@ void setup() {
 
     SETUP_MARK("t1");
     timer1_init(STEP_ISR_PERIOD_US);
+
+    /* INT0 шпиндель + INT2 РГИ — последним: иначе ISR рвёт init/первый кадр LCD */
+    SETUP_MARK("isr");
+    encoder_interrupts_init();
 
     DBG_INFO("SYS", "INIT", "Stage 2.2f ready");
 }
@@ -603,6 +606,17 @@ void loop() {
     }
 
     lcd_mark_dirty_if_changed();
+
+    /* Смена режима: полный clear+rewrite HD44780 (восстановление битого экрана) */
+    if (ui_lcd_take_hard_redraw()) {
+        update_lcd();
+        if (!ui_menu_is_active()) {
+            lcd_cache_save_main();
+        }
+        lcd_dirty = 0;
+        ui_lcd_hard_redraw();
+        last_lcd_ms = millis();
+    }
 
     if (millis() - last_lcd_ms >= LCD_UPDATE_MS) {
         if (lcd_dirty) {
